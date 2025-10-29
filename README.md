@@ -13,7 +13,7 @@ Gemini 1.5 Flash 모델을 활용해 색상, 계절감, 스타일 밸런스를 �
 ---
 
 ## 3. Project Image  
-![웹페이지 예상도](image_file\Gemini_Generated_Image_xa7p0axa7p0axa7p.png)  
+![웹페이지 예상도](docs/ai_closet_stylist_homepage_ex.png)  
 
 
 ---
