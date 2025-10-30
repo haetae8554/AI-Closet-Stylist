@@ -37,14 +37,11 @@ Gemini 1.5 Flash 모델을 활용해 색상, 계절감, 스타일 밸런스를 �
 
 | 이름 | 역할 | 주요 담당 영역 |
 | --- | --- | --- |
-| 이용진 | --- | --- |
-| 구현민 | --- | --- |
-| 한태윤 | --- | --- |
-| 예시  | Frontend 개발 | React 컴포넌트 설계, Tailwind CSS 스타일링, 결과 UI 구성 |
-| 예시  | Backend 개발 | Node.js + Express 서버 구축, API 연동, 데이터 파이프라인 설계 |
-| 예시  | AI 연동 | Gemini 1.5 Flash API 설계, 프롬프트 엔지니어링, JSON 파싱 로직 |
-| 예시  | 데이터 관리 | SQLite/JSON 기반 데이터베이스 설계 및 저장 로직 |
-| 예시  | 총괄 및 문서화 | 일정 관리, 테스트 및 README 작성 |
+| 이용진  | Frontend 개발 | React 컴포넌트 설계, Tailwind CSS 스타일링, 결과 UI 구성 |
+| 구현민  | Backend 개발 | Node.js + Express 서버 구축, API 연동, 데이터 파이프라인 설계 |
+| 한태윤  | AI 연동 | Gemini 1.5 Flash API 설계, 프롬프트 엔지니어링, JSON 파싱 로직 |
+| 공통  | 데이터 관리 | SQLite/JSON 기반 데이터베이스 설계 및 저장 로직 |
+| 공통 | 총괄 및 문서화 | 일정 관리, 테스트 및 README 작성 |
 
 ---
 
