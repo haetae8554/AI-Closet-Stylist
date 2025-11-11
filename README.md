@@ -107,5 +107,3 @@ React 프론트에서 코디 목록 + 설명 표시
 
 
 
-## 기타
-[노션](https://www.notion.so/28c2ec12d123814797d1c7b0b3d764a3)
