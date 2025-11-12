@@ -1,25 +1,22 @@
-import logo from './logo.svg';
-import './App.css';
+import "./App.css";
+import { useNavigate } from "react-router-dom";
 
 function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+    const navigate = useNavigate();
+    const goToCloset = () => navigate("/closet");
+    const goTOAIRecommend = () => navigate("/AI");
+
+    return (
+        <div className="App" style={{ textAlign: "center", marginTop: "20%" }}>
+            <h1>AI Closet Stylist</h1>
+            <button onClick={goToCloset} className="go-btn">
+                옷장으로 이동
+            </button>
+            <button onClick={goTOAIRecommend} className="go-btn">
+                AI 추천
+            </button>
+        </div>
+    );
 }
 
 export default App;
