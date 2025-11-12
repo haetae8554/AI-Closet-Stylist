@@ -1,181 +1,330 @@
-// ====== 상태 ======
-const state = {
-    sourceItems: [],   // setItems로 받은 원본 전체
-    items: [],         // 현재 화면에 표시할 목록(필터/정렬 반영)
-    filter: "전체",
-    page: 1,
-    pageSize: 10,
-};
+// src/closet.js
+import React, { useEffect, useMemo, useState } from "react";
+import "./closet.css";
 
-// ====== 유틸 ======
-const el = (sel) => document.querySelector(sel);
-const money = (n) => n.toLocaleString("ko-KR");
+const h = React.createElement;
+const FILTERS = ["전체", "상의", "아우터", "하의", "신발"];
+const SORT_KEYS = ["정렬: 최신순", "정렬: 이름"];
 
-// 정렬기능
-const Sorter = {
-    latest: (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0),
-    name: (a, b) => (a.title || "").localeCompare(b.title || "", "ko"),
-    low: (a, b) => (a.price ?? 0) - (b.price ?? 0),
-    high: (a, b) => (b.price ?? 0) - (a.price ?? 0),
-};
+// ────────────────────────────────
+// 데이터 정규화
+// ────────────────────────────────
+function normalizeItem(raw, idx = 0) {
+    const id = String(raw?.id ?? Date.now() + "-" + idx);
+    const type = String(raw?.type ?? "").trim();
+    const subType = String(raw?.subType ?? "").trim();
+    const brand = String(raw?.brand ?? "").trim();
+    const nameRaw = (raw?.name ?? "").trim();
+    const name = nameRaw || (brand && subType ? `${brand} ${subType}` : (brand || subType || ""));
+    const colors = Array.isArray(raw?.colors)
+        ? raw.colors.map(String)
+        : (raw?.color ? [String(raw.color)] : []);
+    const thickness = String(raw?.thickness ?? "").trim();
+    const features = Array.isArray(raw?.features)
+        ? raw.features.map((f) => f.trim())
+        : (raw?.feature ? [String(raw.feature).trim()] : []);
 
-// ====== 렌더 ======
-function renderGrid() {
-    const grid = el("#productGrid");
-    const empty = el("#emptyHint");
-    const pageInfo = el("#pageInfo");
-    const prevBtn = el("#prevBtn");
-    const nextBtn = el("#nextBtn");
-
-    grid.innerHTML = "";
-
-    if (!state.items.length) {
-        empty.hidden = false;
-        if (pageInfo) pageInfo.textContent = "1 / 1";
-        if (prevBtn) prevBtn.disabled = true;
-        if (nextBtn) nextBtn.disabled = true;
-        return;
-    }
-    empty.hidden = true;
-
-    const totalPages = Math.max(1, Math.ceil(state.items.length / state.pageSize));
-    if (state.page > totalPages) state.page = totalPages;
-    const start = (state.page - 1) * state.pageSize;
-    const slice = state.items.slice(start, start + state.pageSize);
-
-    slice.forEach(makeCard).forEach(card => grid.appendChild(card));
-
-    if (pageInfo) pageInfo.textContent = `${state.page} / ${totalPages}`;
-    if (prevBtn) prevBtn.disabled = state.page <= 1;
-    if (nextBtn) nextBtn.disabled = state.page >= totalPages;
-}
-
-function makeCard(item) {
-    // item 모델 예:
-    // { id, brand, title, price, originPrice, salePercent, type, colors: ["#hex", ...], imageUrl }
-    const card = document.createElement("article");
-    card.className = "pcard";
-
-    const thumb = document.createElement("div");
-    thumb.className = "pthumb";
-    if (item.imageUrl) {
-        const img = document.createElement("img");
-        img.src = item.imageUrl;
-        img.alt = item.title || "";
-        thumb.appendChild(img);
+    let imageUrl = raw?.imageUrl;
+    if (!imageUrl || imageUrl.trim?.() === "" || imageUrl === "null") {
+        imageUrl = "/images/placeholder.png";
     }
 
-    const meta = document.createElement("div");
-    meta.className = "pmeta";
-    meta.innerHTML = `
-    <div class="brand">${item.brand ?? ""}</div>
-    <div class="title">${item.title ?? ""}</div>
-  `;
-
-    const pricebox = document.createElement("div");
-    pricebox.className = "pricebox";
-    if (item.salePercent) {
-        const s = document.createElement("span");
-        s.className = "sale";
-        s.textContent = `${item.salePercent}%`;
-        pricebox.appendChild(s);
-    }
-    const p = document.createElement("span");
-    p.className = "price";
-    p.textContent = item.price != null ? `${money(item.price)}원` : "";
-    pricebox.appendChild(p);
-
-    if (item.originPrice) {
-        const o = document.createElement("span");
-        o.className = "origin";
-        o.textContent = `${money(item.originPrice)}원`;
-        pricebox.appendChild(o);
-    }
-
-    const colors = document.createElement("div");
-    colors.className = "colors";
-    (item.colors ?? []).slice(0, 6).forEach(hex => {
-        const dot = document.createElement("span");
-        dot.className = "cchip";
-        dot.style.background = hex;
-        colors.appendChild(dot);
-    });
-
-    card.appendChild(thumb);
-    card.appendChild(meta);
-    card.appendChild(pricebox);
-    card.appendChild(colors);
-    return card;
-}
-
-// ====== 필터 ======
-function applyFilter(filter) {
-    state.filter = filter || "전체";
-    const base = state.sourceItems;
-    if (state.filter === "전체") {
-        state.items = base.slice();
-    } else {
-        // item.type: "상의" | "아우터" | "하의" | "신발" 등
-        state.items = base.filter(i => i.type === state.filter);
-    }
-    state.page = 1;
-    renderGrid();
-}
-
-// ====== API (외부에서 데이터 주입) ======
-function setItems(items) {
-    const arr = Array.isArray(items) ? items.slice() : [];
-    state.sourceItems = arr;     // 원본 유지
-    // 기본은 현재 필터 기준으로 반영
-    applyFilter(state.filter);
-}
-function clear() {
-    state.sourceItems = [];
-    state.items = [];
-    state.page = 1;
-    renderGrid();
-}
-function sortBy(key) {
-    const map = {
-        "정렬: 최신순": "latest",
-        "정렬: 이름": "name",
-        "정렬: 가격 낮은순": "low",
-        "정렬: 가격 높은순": "high",
+    return {
+        id,
+        type,
+        subType,
+        name,
+        brand,
+        colors,
+        thickness,
+        features,
+        imageUrl,
+        createdAt: raw?.createdAt || new Date().toISOString(),
+        _incomplete: (type === "" || colors.length === 0),
     };
-    const k = map[key] || "latest";
-    state.items.sort(Sorter[k]);
-    state.page = 1;
-    renderGrid();
 }
 
-// 전역 등록(콘솔/타 모듈에서 사용)
-window.ClosetAPI = { setItems, clear, sortBy, applyFilter, state };
+// ────────────────────────────────
+// URL → 상태 복원
+// ────────────────────────────────
+function restoreFromURL(search, setters) {
+    const params = new URLSearchParams(search);
+    const type = params.get("type");
+    const value = params.get("value");
+    if (!type || !value) return;
 
-// ====== 이벤트 & 최초 렌더 ======
-document.addEventListener("DOMContentLoaded", () => {
-    // 페이지네이션
-    const prevBtn = el("#prevBtn");
-    const nextBtn = el("#nextBtn");
-    prevBtn && prevBtn.addEventListener("click", () => { state.page--; renderGrid(); });
-    nextBtn && nextBtn.addEventListener("click", () => { state.page++; renderGrid(); });
+    switch (type) {
+        case "feature": setters.setFeatureFilter(value); break;
+        case "subType": setters.setSubTypeFilter(value); break;
+        case "brand": setters.setBrandFilter(value); break;
+        case "thickness": setters.setThicknessFilter(value); break;
+        case "filter": setters.setFilter(value); break;
+        default: break;
+    }
+}
+
+// ────────────────────────────────
+// 메인 컴포넌트
+// ────────────────────────────────
+export default function Closet() {
+    const [sourceItems, setSourceItems] = useState([]);
+    const [filter, setFilter] = useState("전체");
+    const [sortKey, setSortKey] = useState("정렬: 최신순");
+    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(true);
+    const [loadErr, setLoadErr] = useState("");
+    const [featureFilter, setFeatureFilter] = useState(null);
+    const [subTypeFilter, setSubTypeFilter] = useState(null);
+    const [brandFilter, setBrandFilter] = useState(null);
+    const [thicknessFilter, setThicknessFilter] = useState(null);
+    const pageSize = 8;
+
+    // 데이터 로드
+    useEffect(() => {
+        (async () => {
+            try {
+                setLoading(true);
+                setLoadErr("");
+                const res = await fetch("/data/clothes.json", { cache: "no-store" });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const normalized = (Array.isArray(data) ? data : []).map(normalizeItem);
+                setSourceItems(normalized);
+            } catch (e) {
+                console.error(e);
+                setLoadErr("데이터 로드 실패");
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, []);
+
+    // 뒤로가기(popstate) 이벤트 → URL 복원
+    // 뒤로가기(popstate) 시 상태 복원
+    useEffect(() => {
+        const onPop = () => {
+            // 1️⃣ 모든 필터 초기화
+            setFeatureFilter(null);
+            setSubTypeFilter(null);
+            setBrandFilter(null);
+            setThicknessFilter(null);
+            setFilter("전체");
+
+            // 2️⃣ 10ms 후 URL 복원 (React 상태 갱신 순서 보장)
+            setTimeout(() => {
+                restoreFromURL(window.location.search, {
+                    setFeatureFilter,
+                    setSubTypeFilter,
+                    setBrandFilter,
+                    setThicknessFilter,
+                    setFilter,
+                });
+            }, 10);
+        };
+
+        window.addEventListener("popstate", onPop);
+
+        // 첫 진입 시 URL 복원
+        restoreFromURL(window.location.search, {
+            setFeatureFilter,
+            setSubTypeFilter,
+            setBrandFilter,
+            setThicknessFilter,
+            setFilter,
+        });
+
+        return () => window.removeEventListener("popstate", onPop);
+    }, []);
+
+
+    // 카테고리별 카운트
+    const counts = useMemo(() => {
+        const map = { 전체: sourceItems.length };
+        for (const t of FILTERS.slice(1))
+            map[t] = sourceItems.filter(i => i.type === t).length;
+        return map;
+    }, [sourceItems]);
+
+    // 필터링
+    const filtered = useMemo(() => {
+        let base = sourceItems;
+        if (filter !== "전체") base = base.filter(i => i.type === filter);
+        if (featureFilter) base = base.filter(i => i.features.includes(featureFilter));
+        if (subTypeFilter) base = base.filter(i => i.subType === subTypeFilter);
+        if (brandFilter) base = base.filter(i => i.brand === brandFilter);
+        if (thicknessFilter) base = base.filter(i => i.thickness === thicknessFilter);
+        return base;
+    }, [sourceItems, filter, featureFilter, subTypeFilter, brandFilter, thicknessFilter]);
 
     // 정렬
-    const sortSelect = el("#sortSelect");
-    sortSelect && sortSelect.addEventListener("change", (e) => sortBy(e.target.value));
+    const sorted = useMemo(() => {
+        const arr = [...filtered];
+        const map = {
+            "정렬: 최신순": (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+            "정렬: 이름": (a, b) =>
+                String(a.name || "").localeCompare(String(b.name || ""), "ko"),
+        };
+        arr.sort(map[sortKey] || map["정렬: 최신순"]);
+        return arr;
+    }, [filtered, sortKey]);
 
-    // NAV 메뉴(전체/상의/아우터/하의/신발)
-    document.querySelectorAll("#nav3 [data-filter]").forEach(a => {
-        a.addEventListener("click", (e) => {
-            e.preventDefault();
-            applyFilter(a.dataset.filter);
-        });
-    });
+    // 페이지네이션
+    const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+    const pageSafe = Math.min(Math.max(1, page), totalPages);
+    const paged = useMemo(() => {
+        const start = (pageSafe - 1) * pageSize;
+        return sorted.slice(start, start + pageSize);
+    }, [sorted, pageSafe]);
 
-    // NAV 우측 "옷 등록하기"
-    el("#btnNavUpload")?.addEventListener("click", () => {
-        alert("옷 등록하기 기능은 준비 중입니다.");
-    });
+    // 필터 변경 시 첫 페이지로
+    useEffect(() => setPage(1), [filter, sortKey, featureFilter, subTypeFilter, brandFilter, thicknessFilter]);
 
-    // 초기 렌더 (빈 상태)
-    renderGrid();
-});
+    // ─────────────── NAV ───────────────
+    const Nav = h("nav", { id: "nav3", role: "navigation" }, [
+        h("a", { href: "/", className: "logo" }, "AI Closet"),
+        h("ul", null,
+            FILTERS.map((f) =>
+                h("li", { key: f },
+                    h("a", {
+                        href: "#",
+                        className:
+                            filter === f && !featureFilter && !subTypeFilter && !brandFilter && !thicknessFilter
+                                ? "active"
+                                : undefined,
+                        onClick: (e) => {
+                            e.preventDefault();
+                            setFilter(f);
+                            setFeatureFilter(null);
+                            setSubTypeFilter(null);
+                            setBrandFilter(null);
+                            setThicknessFilter(null);
+                            window.history.pushState({}, "", `?type=filter&value=${encodeURIComponent(f)}`);
+                        }
+                    }, `${f} (${counts[f] || 0})`)
+                )
+            )
+        ),
+        h("button", {
+            id: "btnNavUpload",
+            className: "nav-upload-btn",
+            onClick: () => alert("옷 등록 기능은 준비 중입니다."),
+        }, "옷 등록하기"),
+    ]);
+
+    // ─────────────── TOOLBAR ───────────────
+    const Toolbar = h("section", { className: "toolbar" }, [
+        h("div", { className: "left" },
+            brandFilter
+                ? `홈 / 옷장 / ${brandFilter}`
+                : subTypeFilter
+                    ? `홈 / 옷장 / ${filter} / ${subTypeFilter}`
+                    : featureFilter
+                        ? `홈 / 옷장 / #${featureFilter}`
+                        : thicknessFilter
+                            ? `홈 / 옷장 / 두께감: ${thicknessFilter}`
+                            : `홈 / 옷장 / ${filter}`
+        ),
+        h("div", { className: "right" },
+            h("select", {
+                id: "sortSelect",
+                value: sortKey,
+                onChange: (e) => setSortKey(e.target.value),
+            }, SORT_KEYS.map((k) => h("option", { key: k, value: k }, k)))
+        ),
+    ]);
+
+    // ─────────────── CARD ───────────────
+    const Card = (item) =>
+        h("article", { key: item.id, className: "pcard" }, [
+            h("div", { className: "pthumb" },
+                h("img", {
+                    src: item.imageUrl,
+                    alt: item.name || "의류 이미지",
+                    loading: "lazy",
+                    onError: (e) => { e.target.src = "/images/placeholder.png"; }
+                })
+            ),
+            h("div", { className: "pmeta" }, [
+                h("div", {
+                    className: "brand clickable",
+                    onClick: () => {
+                        setBrandFilter(item.brand);
+                        window.history.pushState({}, "", `?type=brand&value=${encodeURIComponent(item.brand)}`);
+                    }
+                }, item.brand || "브랜드 미지정"),
+                h("div", {
+                    className: item.name ? "title" : "title empty-name"
+                }, item.name || "—"),
+            ]),
+
+            // 특징 / 소분류
+            h("div", { className: "badges" }, [
+                item.subType
+                    ? h("span", {
+                        className: "badge subtype",
+                        onClick: () => {
+                            setSubTypeFilter(item.subType);
+                            window.history.pushState({}, "", `?type=subType&value=${encodeURIComponent(item.subType)}`);
+                        }
+                    }, `#${item.subType}`)
+                    : null,
+                ...(item.features || []).map((f, i) =>
+                    h("span", {
+                        key: i,
+                        className: "badge feature",
+                        onClick: () => {
+                            setFeatureFilter(f);
+                            window.history.pushState({}, "", `?type=feature&value=${encodeURIComponent(f)}`);
+                        }
+                    }, `#${f}`)
+                ),
+            ].filter(Boolean)),
+
+            // 두께감
+            item.thickness
+                ? h("div", { className: "thickness-row" },
+                    h("span", {
+                        className: "thickness clickable",
+                        onClick: () => {
+                            setThicknessFilter(item.thickness);
+                            window.history.pushState({}, "", `?type=thickness&value=${encodeURIComponent(item.thickness)}`);
+                        }
+                    }, `두께감: ${item.thickness}`)
+                )
+                : null,
+
+            // 색상
+            h("div", { className: "colors" },
+                (item.colors || []).map((c, idx) =>
+                    h("span", { key: idx, className: "cchip", style: { background: c }, title: c })
+                )
+            ),
+        ]);
+
+    // ─────────────── 본문 / 페이지 ───────────────
+    const GridOrEmpty = sorted.length > 0
+        ? h("section", { id: "productGrid", className: "product-grid" }, paged.map(Card))
+        : h("p", { className: "empty-hint" },
+            loading ? "불러오는 중…" : (loadErr || "불러온 옷이 없습니다.")
+        );
+
+    const Pager = sorted.length > 0
+        ? h("footer", { className: "pager" }, [
+            h("button", {
+                disabled: pageSafe <= 1,
+                onClick: () => setPage(p => Math.max(1, p - 1))
+            }, "이전"),
+            h("span", { className: "page-info" }, `${pageSafe} / ${totalPages}`),
+            h("button", {
+                disabled: pageSafe >= totalPages,
+                onClick: () => setPage(p => Math.min(totalPages, p + 1))
+            }, "다음"),
+        ])
+        : null;
+
+    // ─────────────── 렌더링 ───────────────
+    return h("div", { className: "closet-page" }, [
+        Nav,
+        h("main", { className: "closet-container" }, [Toolbar, GridOrEmpty, Pager]),
+    ]);
+}

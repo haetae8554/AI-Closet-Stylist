@@ -1,10 +1,9 @@
-// src/App.js
 import './App.css';
+import { useNavigate } from 'react-router-dom';
 
 function App() {
-  const goToCloset = () => {
-    window.location.href = process.env.PUBLIC_URL + '/closet.html';
-  };
+  const navigate = useNavigate();
+  const goToCloset = () => navigate('/closet');
 
   return (
     <div className="App" style={{ textAlign: 'center', marginTop: '20%' }}>
