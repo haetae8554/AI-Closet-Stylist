@@ -1,164 +1,171 @@
-import React, { useState, useEffect } from "react";
+// src/AIRecommend.js
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./AIRecommend.css";
 
-const CATEGORIES = ["아우터", "상의", "하의", "신발"];
-
 export default function AIRecommend() {
-    const [items, setItems] = useState([]);
-    const [currentCategory, setCurrentCategory] = useState("아우터");
-    const [selected, setSelected] = useState({
+    const navigate = useNavigate();
+    const [allClothes, setAllClothes] = useState([]);
+    const [selectedItems, setSelectedItems] = useState({
         아우터: null,
         상의: null,
         하의: null,
         신발: null,
     });
+    const [category, setCategory] = useState("아우터");
+    const [loading, setLoading] = useState(false);
 
-    // 옷 데이터 로드
+    // ✅ public/data 폴더에서 clothes.json 불러오기
     useEffect(() => {
-        (async () => {
-            const res = await fetch("/data/clothes.json");
-            const data = await res.json();
-            setItems(Array.isArray(data) ? data : []);
-        })();
+        fetch("/data/clothes.json", { cache: "no-store" })
+            .then((res) => res.json())
+            .then((data) => {
+                console.log("🧥 옷 데이터 불러옴:", data);
+
+                // ✅ 이미지 없으면 기본 이미지로 대체
+                const normalized = (Array.isArray(data) ? data : []).map(
+                    (item, idx) => {
+                        let imageUrl = item?.imageUrl;
+                        if (
+                            !imageUrl ||
+                            imageUrl.trim?.() === "" ||
+                            imageUrl === "null"
+                        ) {
+                            imageUrl = "/images/placeholder.png";
+                        }
+                        return { ...item, imageUrl };
+                    }
+                );
+
+                setAllClothes(normalized);
+            })
+            .catch((err) => {
+                console.error("옷 데이터 불러오기 실패:", err);
+                setAllClothes([]);
+            });
     }, []);
 
-    // 현재 카테고리별 옷 목록
-    const filtered = items.filter((i) => i.type === currentCategory);
+    // ✅ 카테고리별 필터링 (한글 기준)
+    const filteredClothes = allClothes.filter((item) => item.type === category);
 
-    // 선택된 카테고리 칸 클릭 시 왼쪽 카테고리 변경
-    const handleCategoryClick = (category) => {
-        setCurrentCategory(category);
+    const handleSelect = (cloth) => {
+        setSelectedItems((prev) => ({ ...prev, [category]: cloth }));
     };
 
-    // 왼쪽 목록에서 옷 선택
-    const handleSelectItem = (item) => {
-        setSelected((prev) => ({
-            ...prev,
-            [currentCategory]: item,
-        }));
+    const handleRemove = (type) => {
+        setSelectedItems((prev) => ({ ...prev, [type]: null }));
     };
 
-    // X 버튼 클릭 → 해당 칸 비우기
-    const handleRemove = (category) => {
-        setSelected((prev) => ({
-            ...prev,
-            [category]: null,
-        }));
-    };
+    const handleRecommend = async () => {
+        try {
+            setLoading(true);
+            const res = await fetch("http://localhost:3001/api/recommend", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    clothes: allClothes, // ✅ 전체 옷 데이터
+                    selected: selectedItems,
+                }),
+            });
 
-    const handleNext = () => {
-        const finalSelection = {};
+            const data = await res.json();
+            console.log("AI 추천 결과:", data);
 
-        CATEGORIES.forEach((cat) => {
-            const chosen = selected[cat];
-
-            // 사용자가 직접 선택한 경우만 fixed:true
-            if (chosen) {
-                finalSelection[cat] = { ...chosen, fixed: true };
-            } else {
-                finalSelection[cat] = null; // 아무것도 선택하지 않으면 null (AI가 알아서)
-            }
-        });
-
-        // 결과 페이지로 전달
-        localStorage.setItem("selectedClothes", JSON.stringify(finalSelection));
-        window.location.href = "AI/result";
+            navigate("/AI/result", {
+                state: {
+                    allClothes,
+                    selectedItems,
+                    recommendations: data.recommendations || [],
+                },
+            });
+        } catch (err) {
+            console.error("AI 추천 요청 실패:", err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <div className="ai-page">
-            <nav className="nav">
-                <a href="/" className="logo">
-                    AI Closet
-                </a>
-                <a href="/closet" className="link">
-                    내 옷장
-                </a>
-            </nav>
+            <h2>AI 코디 추천</h2>
 
-            <main className="ai-container">
-                <h1>AI 추천을 위한 옷 선택</h1>
+            <div className="category-bar">
+                {["아우터", "상의", "하의", "신발"].map((cat) => (
+                    <button
+                        key={cat}
+                        className={`cat-btn ${
+                            category === cat ? "active" : ""
+                        }`}
+                        onClick={() => setCategory(cat)}
+                    >
+                        {cat}
+                    </button>
+                ))}
+            </div>
 
-                <div className="ai-layout">
-                    {/* 왼쪽: 옷 목록 */}
-                    <section className="clothes-list">
-                        <h2>{currentCategory}</h2>
-                        {filtered.length === 0 ? (
-                            <p className="empty">
-                                이 카테고리에는 옷이 없습니다.
+            <div className="ai-layout">
+                <div className="clothes-list">
+                    {filteredClothes.map((cloth) => (
+                        <div
+                            key={cloth.id}
+                            className={`cloth-card ${
+                                selectedItems[category]?.id === cloth.id
+                                    ? "selected"
+                                    : ""
+                            }`}
+                            onClick={() => handleSelect(cloth)}
+                        >
+                            <img
+                                src={cloth.imageUrl}
+                                alt={cloth.name}
+                                onError={(e) => {
+                                    e.target.src = "/images/placeholder.png";
+                                }}
+                            />
+                            <p>{cloth.name}</p>
+                            <p style={{ fontSize: "0.8rem", color: "#666" }}>
+                                {cloth.brand}
                             </p>
-                        ) : (
-                            filtered.map((item) => (
-                                <div
-                                    key={item.id}
-                                    className={`cloth-card ${
-                                        selected[currentCategory]?.id ===
-                                        item.id
-                                            ? "selected"
-                                            : ""
-                                    }`}
-                                    onClick={() => handleSelectItem(item)}
-                                >
-                                    <img src={item.imageUrl} alt={item.name} />
-                                    <div className="meta">
-                                        <div className="brand">
-                                            {item.brand}
-                                        </div>
-                                        <div className="name">{item.name}</div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </section>
-
-                    {/* 오른쪽: 카테고리별 선택 칸 */}
-                    <aside className="selected-panel">
-                        {CATEGORIES.map((cat) => (
-                            <div
-                                key={cat}
-                                className={`select-slot ${
-                                    currentCategory === cat ? "active" : ""
-                                }`}
-                                onClick={() => handleCategoryClick(cat)}
-                            >
-                                <div className="slot-header">
-                                    <span>{cat}</span>
-                                    {selected[cat] && (
-                                        <button
-                                            className="remove-btn"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleRemove(cat);
-                                            }}
-                                        >
-                                            ✕
-                                        </button>
-                                    )}
-                                </div>
-
-                                {selected[cat] ? (
-                                    <div className="slot-item">
-                                        <img
-                                            src={selected[cat].imageUrl}
-                                            alt={selected[cat].name}
-                                        />
-                                        <div>{selected[cat].name}</div>
-                                    </div>
-                                ) : (
-                                    <div className="slot-empty">
-                                        선택된 옷 없음
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </aside>
+                        </div>
+                    ))}
                 </div>
 
-                {/* 다음 단계 버튼 */}
-                <button className="recommend-btn" onClick={handleNext}>
-                    AI 추천받기 →
-                </button>
-            </main>
+                <div className="selected-panel">
+                    <h3>선택된 옷</h3>
+                    {["아우터", "상의", "하의", "신발"].map((type) => (
+                        <div key={type} className="selected-item">
+                            {selectedItems[type] ? (
+                                <>
+                                    <img
+                                        src={selectedItems[type].imageUrl}
+                                        alt={selectedItems[type].name}
+                                        onError={(e) => {
+                                            e.target.src =
+                                                "/images/placeholder.png";
+                                        }}
+                                    />
+                                    <span>{selectedItems[type].name}</span>
+                                    <button
+                                        className="remove-btn"
+                                        onClick={() => handleRemove(type)}
+                                    >
+                                        ✕
+                                    </button>
+                                </>
+                            ) : (
+                                <span>{type} 선택 안 함</span>
+                            )}
+                        </div>
+                    ))}
+                    <button
+                        className="recommend-btn"
+                        onClick={handleRecommend}
+                        disabled={loading}
+                    >
+                        {loading ? "AI가 코디 중..." : "AI 추천받기"}
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
