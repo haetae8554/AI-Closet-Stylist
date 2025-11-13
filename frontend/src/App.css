@@ -32,7 +32,35 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
+}
+
+/* src/App.css */
+body {
+  margin: 0;
+  font-family: 'Noto Sans KR', sans-serif;
+  background-color: #f7f7f7;
+}
+
+.App h1 {
+  color: #111;
+  margin-bottom: 20px;
+}
+
+.go-btn {
+  padding: 12px 28px;
+  background-color: #111;
+  color: #fff;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.go-btn:hover {
+  background-color: #333;
 }

@@ -1,13 +1,19 @@
-body {
-  margin: 0;
-  font - family: -apple - system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans - serif;
-  -webkit - font - smoothing: antialiased;
-  -moz - osx - font - smoothing: grayscale;
-}
+// src/index.js
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import App from "./App";
+import Closet from "./closet";
+import Closet_detail from "./closet_detail";
 
-code {
-  font - family: source - code - pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
+const root = ReactDOM.createRoot(document.getElementById("root"));
+
+root.render(
+  <BrowserRouter>
+    <Routes>
+      <Route path="/" element={<App />} />
+      <Route path="/closet" element={<Closet />} />
+      <Route path="/closet_detail" element={<Closet_detail />} />
+    </Routes>
+  </BrowserRouter>
+);

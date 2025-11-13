@@ -1,0 +1,239 @@
+[
+    {
+        "id": "top-001",
+        "name": null,
+        "brand": "무신사 스탠다드",
+        "type": "상의",
+        "subType": "후드티",
+        "colors": [
+            "#aaaaaa"
+        ],
+        "thickness": "보통",
+        "features": [
+            "오버핏",
+            "기본템"
+        ],
+        "imageUrl": null,
+        "createdAt": "2025-11-12T09:00:00.000Z"
+    },
+    {
+        "id": "top-002",
+        "name": "",
+        "brand": "커버낫",
+        "type": "상의",
+        "subType": "맨투맨",
+        "colors": [
+            "#000000"
+        ],
+        "thickness": "두꺼움",
+        "features": [
+            "기모소재",
+            "로고프린트"
+        ],
+        "imageUrl": "/images/tops/covernat_black_sweat.png",
+        "createdAt": "2025-11-10T10:00:00.000Z"
+    },
+    {
+        "id": "top-003",
+        "name": null,
+        "brand": "유니클로",
+        "type": "상의",
+        "subType": "반팔티",
+        "colors": [
+            "#ffffff"
+        ],
+        "thickness": "얇음",
+        "features": [
+            "코튼100%",
+            "데일리"
+        ],
+        "imageUrl": null,
+        "createdAt": "2025-11-09T12:00:00.000Z"
+    },
+    {
+        "id": "top-004",
+        "name": null,
+        "brand": null,
+        "type": "상의",
+        "subType": "셔츠",
+        "colors": [
+            "#dcdcdc"
+        ],
+        "thickness": "얇음",
+        "features": [
+            "버튼다운",
+            "포멀"
+        ],
+        "imageUrl": null,
+        "createdAt": "2025-11-08T11:00:00.000Z"
+    },
+    {
+        "id": "outer-001",
+        "name": null,
+        "brand": "지오다노",
+        "type": "아우터",
+        "subType": "자켓",
+        "colors": [
+            "#111111"
+        ],
+        "thickness": "보통",
+        "features": [
+            "심플디자인",
+            "포멀룩"
+        ],
+        "imageUrl": null,
+        "createdAt": "2025-11-07T10:00:00.000Z"
+    },
+    {
+        "id": "outer-002",
+        "name": null,
+        "brand": "트립런업",
+        "type": "아우터",
+        "subType": "패딩",
+        "colors": [
+            "#444444",
+            "#777777"
+        ],
+        "thickness": "두꺼움",
+        "features": [
+            "바이커 퀼팅"
+        ],
+        "imageUrl": "/images/outers/biker_puffer.png",
+        "createdAt": "2025-11-06T15:00:00.000Z"
+    },
+    {
+        "id": "pants-001",
+        "name": null,
+        "brand": "무신사 스탠다드",
+        "type": "하의",
+        "subType": "청바지",
+        "colors": [
+            "#335588"
+        ],
+        "thickness": "보통",
+        "features": [
+            "슬림핏",
+            "스트레치"
+        ],
+        "imageUrl": null,
+        "createdAt": "2025-11-05T10:30:00.000Z"
+    },
+    {
+        "id": "pants-002",
+        "name": "",
+        "brand": "리바이스",
+        "type": "하의",
+        "subType": "와이드팬츠",
+        "colors": [
+            "#222222"
+        ],
+        "thickness": "보통",
+        "features": [
+            "와이드핏",
+            "데일리"
+        ],
+        "imageUrl": null,
+        "createdAt": "2025-11-05T09:40:00.000Z"
+    },
+    {
+        "id": "shoes-001",
+        "name": null,
+        "brand": "나이키",
+        "type": "신발",
+        "subType": "스니커즈",
+        "colors": [
+            "#ffffff"
+        ],
+        "thickness": null,
+        "features": [
+            "로우컷",
+            "가죽소재"
+        ],
+        "imageUrl": "/images/shoes/nike_airforce1.png",
+        "createdAt": "2025-11-04T12:00:00.000Z"
+    },
+    {
+        "id": "shoes-002",
+        "name": null,
+        "brand": "컨버스",
+        "type": "신발",
+        "subType": "스니커즈",
+        "colors": [
+            "#000000"
+        ],
+        "thickness": null,
+        "features": [
+            "캔버스",
+            "로우탑"
+        ],
+        "imageUrl": null,
+        "createdAt": "2025-11-04T09:00:00.000Z"
+    },
+    {
+        "id": "outer-003",
+        "name": "",
+        "brand": "노스페이스",
+        "type": "아우터",
+        "subType": "패딩",
+        "colors": [
+            "#333333"
+        ],
+        "thickness": "두꺼움",
+        "features": [
+            "보온성",
+            "경량소재"
+        ],
+        "imageUrl": null,
+        "createdAt": "2025-11-03T17:00:00.000Z"
+    },
+    {
+        "id": "top-005",
+        "name": null,
+        "brand": "라코스테",
+        "type": "상의",
+        "subType": "니트",
+        "colors": [
+            "#c0a97c"
+        ],
+        "thickness": "보통",
+        "features": [
+            "니트짜임"
+        ],
+        "imageUrl": null,
+        "createdAt": "2025-11-03T08:00:00.000Z"
+    },
+    {
+        "id": "pants-003",
+        "name": null,
+        "brand": null,
+        "type": "하의",
+        "subType": "트레이닝팬츠",
+        "colors": [
+            "#888888"
+        ],
+        "thickness": "보통",
+        "features": [
+            "밴딩허리",
+            "편안함"
+        ],
+        "imageUrl": null,
+        "createdAt": "2025-11-02T18:30:00.000Z"
+    },
+    {
+        "id": "outer-004",
+        "name": null,
+        "brand": null,
+        "type": "아우터",
+        "subType": "코트",
+        "colors": [
+            "#1a1a1a"
+        ],
+        "thickness": "두꺼움",
+        "features": [
+            "롱코트",
+            "겨울용"
+        ],
+        "imageUrl": null,
+        "createdAt": "2025-11-02T11:00:00.000Z"
+    }
+]
