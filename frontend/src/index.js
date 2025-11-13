@@ -5,6 +5,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import App from "./App";
 import Closet from "./closet";
 import Closet_detail from "./closet_detail";
+import AIRecommend from "./AIRecommend";
+import AIResult from "./AIResult";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
@@ -14,6 +16,8 @@ root.render(
       <Route path="/" element={<App />} />
       <Route path="/closet" element={<Closet />} />
       <Route path="/closet_detail" element={<Closet_detail />} />
+      <Route path="/AI" element={<AIRecommend />} />
+      <Route path="/AI/result" element={<AIResult />} />
     </Routes>
   </BrowserRouter>
 );
