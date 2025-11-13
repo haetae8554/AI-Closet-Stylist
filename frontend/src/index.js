@@ -3,7 +3,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import App from "./App";
-import Closet from "./closet"; // 확장자 생략 OK
+import Closet from "./closet";
+import Closet_detail from "./closet_detail";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
@@ -12,6 +13,7 @@ root.render(
     <Routes>
       <Route path="/" element={<App />} />
       <Route path="/closet" element={<Closet />} />
+      <Route path="/closet_detail" element={<Closet_detail />} />
     </Routes>
   </BrowserRouter>
 );
