@@ -38,7 +38,7 @@ export default function AIResult() {
                             코디 #{idx + 1}
                         </h3>
 
-                        {/* ✅ 가로 한 줄 정렬 */}
+                        {/* 가로 한 줄 정렬 */}
                         <div
                             className="result-clothes"
                             style={{
@@ -53,8 +53,8 @@ export default function AIResult() {
                                 const item = findClothById(combo[type]);
                                 const imageUrl =
                                     !item?.imageUrl ||
-                                    item.imageUrl.trim?.() === "" ||
-                                    item.imageUrl === "null"
+                                        item.imageUrl.trim?.() === "" ||
+                                        item.imageUrl === "null"
                                         ? "/images/placeholder.png"
                                         : item.imageUrl;
 

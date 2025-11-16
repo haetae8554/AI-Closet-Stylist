@@ -1,24 +1,337 @@
 // src/App.js
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./App.css";
+
+// 숫자 두 자리
+function pad2(n) {
+  return n < 10 ? "0" + n : String(n);
+}
+
+// 요일 이름
+const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+
+// KMA 시각 포맷 변환 (TM_FC: yyyymmddHHmm)
+function formatKmaTime(value) {
+  if (value === null || value === undefined) return "";
+  const s = String(value).trim();
+  if (s.length !== 12) return s;
+
+  const y = s.slice(0, 4);
+  const m = s.slice(4, 6);
+  const d = s.slice(6, 8);
+  const h = s.slice(8, 10);
+  const min = s.slice(10, 12);
+  return `${y}-${m}-${d} ${h}:${min}`;
+}
+
+// KMA 날짜 문자열 → Date
+function parseKmaDate(value) {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  if (s.length !== 12 && s.length !== 10 && s.length !== 8) return null;
+
+  const y = Number(s.slice(0, 4));
+  const m = Number(s.slice(4, 6)) - 1;
+  const d = Number(s.slice(6, 8));
+  const h = s.length >= 10 ? Number(s.slice(8, 10)) : 0;
+
+  if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return null;
+  return new Date(y, m, d, h);
+}
+
+// MM/DD(요일) 포맷
+function formatShortKoreanDate(date) {
+  if (!date) return "";
+  const mm = pad2(date.getMonth() + 1);
+  const dd = pad2(date.getDate());
+  const w = DAY_NAMES[date.getDay()];
+  return `${mm}/${dd}(${w})`;
+}
+
+// 날씨 코드/문장 → 이모지
+function getWeatherEmoji(skyCode, summaryText = "") {
+  const code = String(skyCode || "");
+  const text = String(summaryText || "");
+
+  if (code.includes("DB") || code.includes("RA") || text.includes("비")) return "🌧️";
+  if (code.includes("SN") || text.includes("눈")) return "❄️";
+  if (code === "1" || text.includes("맑")) return "☀️";
+  if (code === "2" || text.includes("구름")) return "⛅";
+  return "🌤️";
+}
+
+// 아이템에서 날짜키 추출 yyyymmdd
+function getDateKeyFromItem(it) {
+  const raw =
+    it.TM_EF ||
+    it.tmEf ||
+    it.tmEfDateTime ||
+    it.TM_FC ||
+    it.tmFc ||
+    "";
+  const s = String(raw).trim();
+  if (s.length < 8) return null;
+  return s.slice(0, 8);
+}
 
 function App() {
   const navigate = useNavigate();
 
+  const [weather, setWeather] = useState(null);
+  const [weatherLoading, setWeatherLoading] = useState(true);
+  const [weatherError, setWeatherError] = useState("");
+
+  useEffect(() => {
+    async function fetchWeather() {
+      try {
+        setWeatherLoading(true);
+        setWeatherError("");
+
+        // proxy 설정을 사용하므로 절대경로 대신 상대경로 사용
+        const res = await fetch(`/api/weather/current`);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        setWeather(data);
+      } catch (e) {
+        console.error("[FRONT] 날씨 조회 오류:", e);
+        setWeatherError(e.message || "날씨 조회 실패");
+      } finally {
+        setWeatherLoading(false);
+      }
+    }
+
+    fetchWeather();
+  }, []);
+
   const goToCloset = () => navigate("/closet");
   const goToAI = () => navigate("/AI");
 
+  const renderWeather = () => {
+    if (weatherLoading) {
+      return <p className="weather-message">날씨 정보를 불러오는 중입니다.</p>;
+    }
+    if (weatherError) {
+      return <p className="weather-message">날씨 정보를 가져오지 못했습니다.</p>;
+    }
+    if (!weather) {
+      return <p className="weather-message">날씨 정보가 없습니다.</p>;
+    }
+
+    const loc = weather.location || {};
+    const regId = weather.regId || "";
+    const regionName =
+      weather.regionName ||
+      (weather.region && weather.region.name) ||
+      loc.city ||
+      loc.region ||
+      "";
+
+    const land = weather.landFcst || {};
+    const items = Array.isArray(land.items) ? land.items : [];
+    const main = items[1] || items[0] || null;
+
+    if (!main) {
+      return <p className="weather-message">예보 데이터가 없습니다.</p>;
+    }
+
+    const tmFc =
+      main.TM_FC ||
+      main.tmFc ||
+      main.tmFcDateTime ||
+      main.announceTime ||
+      null;
+
+    const baseDate =
+      parseKmaDate(main.TM_EF || main.TM_FC || main.tmEf || main.tmFc) ||
+      new Date();
+    const todayKey =
+      baseDate &&
+      `${baseDate.getFullYear()}${pad2(baseDate.getMonth() + 1)}${pad2(
+        baseDate.getDate()
+      )}`;
+
+    let temp = null;
+    {
+      const cand = [main.TA, main.ta, main.temp, main.tmn, main.tmx];
+      const found = cand.find(
+        (v) => v !== undefined && v !== null && String(v).trim() !== ""
+      );
+      if (found !== undefined) {
+        const n = Number(found);
+        temp = Number.isNaN(n) ? found : n;
+      }
+    }
+
+    const summary =
+      main.WF || main.wf || main.wfSv || main.wfTxt || "예보 요약 없음";
+    const skyCode = main.SKY || main.sky || main.wfCd || "";
+    const rainProb = main.rnSt ?? main.RN_ST ?? main.ST ?? null;
+
+    const wind1 = main.wd1 || main.WD1 || "";
+    const wind2 = main.wd2 || main.WD2 || "";
+    const windText =
+      wind1 && wind2 ? `${wind1} → ${wind2}` : wind1 || wind2 || "";
+
+    const todayEmoji = getWeatherEmoji(skyCode, summary);
+
+    // 날짜별 그룹화
+    const groupsMap = {};
+    for (const it of items) {
+      const key = getDateKeyFromItem(it);
+      if (!key) continue;
+      if (!groupsMap[key]) {
+        groupsMap[key] = {
+          key,
+          date: parseKmaDate(key + "0000"),
+          items: [],
+        };
+      }
+      groupsMap[key].items.push(it);
+    }
+
+    const allGroups = Object.values(groupsMap).sort((a, b) =>
+      a.key.localeCompare(b.key)
+    );
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    const baseDay = allGroups.find((g) => g.key === todayKey)?.date || baseDate;
+
+    const futureGroups = [];
+    for (const g of allGroups) {
+      if (!g.date || !baseDay) continue;
+      const diffDays = Math.round((g.date.getTime() - baseDay.getTime()) / dayMs);
+      if (diffDays <= 0) continue;
+      if (diffDays > 2) continue;
+      futureGroups.push({ ...g, diffDays });
+      if (futureGroups.length >= 2) break;
+    }
+
+    const getDayLabel = (diff) => {
+      if (diff === 1) return "내일";
+      if (diff === 2) return "모레";
+      return `${diff}일 후`;
+    };
+
+    const forecastList = futureGroups.map((g, idx) => {
+      const temps = [];
+      const rains = [];
+      let sumText = "";
+      let code = "";
+
+      for (const it of g.items) {
+        const candT = [it.TA, it.ta, it.temp, it.tmn, it.tmx];
+        const foundT = candT.find(
+          (v) => v !== undefined && v !== null && String(v).trim() !== ""
+        );
+        if (foundT !== undefined) {
+          const n = Number(foundT);
+          if (!Number.isNaN(n) && n > -99) temps.push(n);
+        }
+
+        const candR = [it.rnSt, it.RN_ST, it.ST];
+        const foundR = candR.find(
+          (v) => v !== undefined && v !== null && String(v).trim() !== ""
+        );
+        if (foundR !== undefined) {
+          const n = Number(foundR);
+          if (!Number.isNaN(n) && n >= 0) rains.push(n);
+        }
+
+        const s = it.wf || it.WF || "";
+        if (s) sumText = s;
+        code = it.wfCd || it.WFCD || it.SKY || it.sky || code || "";
+      }
+
+      const minT = temps.length ? Math.min(...temps) : null;
+      const maxT = temps.length ? Math.max(...temps) : null;
+      const maxRain = rains.length ? Math.max(...rains) : null;
+
+      const emoji = getWeatherEmoji(code, sumText || summary);
+      const dateLabel = g.date ? formatShortKoreanDate(g.date) : "";
+      const labelText = `${getDayLabel(g.diffDays)}${dateLabel ? " " + dateLabel : ""
+        }`;
+
+      let tempText = "--℃";
+      if (minT !== null && maxT !== null) {
+        if (minT === maxT) tempText = `${maxT}℃`;
+        else tempText = `${minT}~${maxT}℃`;
+      }
+
+      return (
+        <div className="forecast-item" key={idx}>
+          <div className="forecast-left">
+            <div className="forecast-emoji">{emoji}</div>
+            <div className="forecast-label">{labelText}</div>
+          </div>
+          <div className="forecast-right">
+            <div className="forecast-temp">{tempText}</div>
+            <div className="forecast-sub">
+              <span className="forecast-summary">
+                {sumText || "예보 없음"}
+              </span>
+              {maxRain !== null && (
+                <span className="forecast-rain">· 강수 {maxRain}%</span>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    });
+
+    return (
+      <div className="weather-card">
+        <div className="weather-icon">{todayEmoji}</div>
+
+        <div className="weather-temp">
+          {temp !== null && temp !== undefined ? `${temp}℃` : "--℃"}
+        </div>
+
+        <div className="weather-summary">{summary}</div>
+
+        <div className="weather-location-main">
+          {regionName || loc.city || loc.region || "-"}
+        </div>
+
+        <div className="weather-info-list">
+          {rainProb !== null && (
+            <div className="info-row">
+              <span className="label">강수확률</span>
+              <span className="value">{rainProb}%</span>
+            </div>
+          )}
+          {windText && (
+            <div className="info-row">
+              <span className="label">바람</span>
+              <span className="value">{windText}</span>
+            </div>
+          )}
+        </div>
+
+        {forecastList.length > 0 && (
+          <div className="weather-forecast-list">{forecastList}</div>
+        )}
+
+        {tmFc && (
+          <div className="weather-basetime">
+            기준시각 {formatKmaTime(tmFc)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
-      {/* 🔹 메인 전용 Navbar (옷장/상세에서 쓰는 nav랑 일부러 다르게 유지) */}
       <nav id="nav3">
         <a href="/" className="logo">
           AI Closet
         </a>
 
         <ul>
-          {/* 메인에서 옷장 / AI 페이지로만 이동 */}
           <li>
             <a
               href="#"
@@ -59,11 +372,9 @@ function App() {
         </select>
       </nav>
 
-      {/* 🔹 메인 페이지 내용 */}
       <main className="clothes-area">
         <h2>My Closet</h2>
 
-        {/* 이 버튼도 실제로 /closet 으로 이동하게 연결 */}
         <button className="registration-btn" onClick={goToCloset}>
           옷장으로 이동
         </button>
@@ -82,14 +393,11 @@ function App() {
 
           <aside className="weather-section">
             <h3>오늘의 날씨</h3>
-            <div className="placeholder-content">
-              <p>날씨 정보</p>
-            </div>
+            <div className="placeholder-content">{renderWeather()}</div>
           </aside>
         </div>
 
         <section className="ai-section">
-          {/* 여기서도 /AI 페이지로 라우팅 */}
           <button className="ai-recommend-btn" onClick={goToAI}>
             AI 추천 받기
           </button>
