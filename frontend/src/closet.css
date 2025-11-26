@@ -1,0 +1,300 @@
+/* ─────────────── 기본 설정 ─────────────── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+a {
+  text-decoration: none;
+  color: #ccc;
+  font-size: 15px;
+  transition: color 0.2s;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  padding-top: 60px;
+  background: #f5f5f5;
+  font-family: "Noto Sans KR", sans-serif;
+}
+
+/* ─────────────── NAV ─────────────── */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 60px;
+  background-color: #111;
+  border-bottom: 1px solid #222;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+}
+
+#nav3 {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ccc;
+}
+
+/* 왼쪽 로고 */
+#nav3>.logo {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+}
+
+/* 가운데 메뉴 */
+#nav3>ul {
+  display: flex;
+  gap: 25px;
+}
+
+#nav3>ul li a {
+  color: #ccc;
+}
+
+#nav3>ul li a:hover,
+#nav3>ul li a.active {
+  color: #fff;
+  border-bottom: 2px solid #fff;
+  padding-bottom: 2px;
+}
+
+/* 오른쪽 버튼 */
+#nav3>.nav-upload-btn {
+  padding: 6px 16px;
+  background-color: #111;
+  color: #ccc;
+  border: 1px solid #333;
+  border-radius: 20px;
+  outline: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+#nav3>.nav-upload-btn:hover {
+  border-color: #fff;
+  color: #fff;
+}
+
+/* ─────────────── 페이지 레이아웃 ─────────────── */
+.closet-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* ─────────────── TOOLBAR ─────────────── */
+.toolbar {
+  margin-top: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toolbar .right select {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* ─────────────── GRID ─────────────── */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* ─────────────── 카드 스타일 ─────────────── */
+.pcard {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eee;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.pcard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+/* 썸네일 */
+.pthumb {
+  width: 100%;
+  height: 220px;
+  overflow: hidden;
+  background: #f7f7f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pthumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 메타 정보 */
+.pmeta {
+  padding: 10px 14px 8px 14px;
+}
+
+.pmeta .brand {
+  font-weight: 600;
+  font-size: 15px;
+  color: #333;
+}
+
+.pmeta .brand.clickable {
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.pmeta .brand.clickable:hover {
+  color: #000;
+}
+
+.pmeta .title {
+  font-size: 14px;
+  color: #555;
+}
+
+.pmeta .title.empty-name {
+  color: #aaa;
+}
+
+/* 배지 (소분류, 특징) */
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 14px 8px 14px;
+}
+
+.badge {
+  font-size: 12px;
+  color: #666;
+  background: #f3f3f3;
+  border-radius: 8px;
+  padding: 3px 7px;
+  cursor: pointer;
+}
+
+.badge:hover {
+  background: #eaeaea;
+}
+
+/* 두께감 */
+.thickness-row {
+  padding: 0 14px 6px 14px;
+}
+
+.thickness {
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+}
+
+.thickness:hover {
+  color: #000;
+}
+
+/* 색상칩 */
+.colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 14px 10px 14px;
+}
+
+.cchip {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid #ddd;
+}
+
+/* ─────────────── 페이지네이션 ─────────────── */
+.pager {
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.pager button {
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.pager button:hover {
+  background: #f0f0f0;
+}
+
+.pager button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.page-info {
+  font-size: 14px;
+  color: #555;
+}
+
+/* ─────────────── 빈 상태 ─────────────── */
+.empty-hint {
+  text-align: center;
+  color: #999;
+  font-size: 15px;
+  margin-top: 40px;
+}
+
+/* ─────────────── 반응형 ─────────────── */
+@media (max-width: 1024px) {
+  .product-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+}
