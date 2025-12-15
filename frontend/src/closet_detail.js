@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./closet_detail.css";
 
+// [수정] 설정 파일에서 API 주소 가져오기
+// (파일 위치에 따라 "./apiConfig" 또는 "../apiConfig"로 경로를 맞춰주세요)
+import { API_BASE_URL } from "./apiConfig";
+
 const h = React.createElement;
 const FILTERS = ["전체", "상의", "아우터", "하의", "신발"];
 const PLACEHOLDER = "/images/placeholder.png";
@@ -16,7 +20,6 @@ function getSafeImageSrc(url) {
 }
 
 // --- 색상 변환 유틸 (Hex -> Name) ---
-// 복잡한 수식이므로 로직 수정보다는 그대로 두는 것을 추천
 function hexToRgb(hex) {
     if (!hex) return null;
     let h = hex.replace("#", "");
@@ -25,6 +28,7 @@ function hexToRgb(hex) {
     const n = parseInt(h, 16);
     return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
+
 function rgbToHsl({ r, g, b }) {
     r /= 255; g /= 255; b /= 255;
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
@@ -42,6 +46,7 @@ function rgbToHsl({ r, g, b }) {
     }
     return { h, s: s * 100, l: l * 100 };
 }
+
 function colorNameFromHex(hex) {
     const rgb = hexToRgb(hex);
     if (!rgb) return hex || "색상 미상";
@@ -70,11 +75,12 @@ export default function ClosetDetail() {
     const [current, setCurrent] = useState(null);
     const [imgBroken, setImgBroken] = useState(false);
 
-    // API를 통해 전체 옷 목록을 가져옴 (이전/다음 버튼 기능을 위해 전체 리스트 필요)
+    // API를 통해 전체 옷 목록을 가져옴
     useEffect(() => {
         (async () => {
             try {
-                const res = await fetch("http://localhost:3001/api/clothes");
+                // [수정] 상수(API_BASE_URL) 사용
+                const res = await fetch(`${API_BASE_URL}/api/clothes`);
                 if (!res.ok) throw new Error("Load Failed");
                 const data = await res.json();
                 setItems(Array.isArray(data) ? data : []);
@@ -90,10 +96,10 @@ export default function ClosetDetail() {
         const id = params.get("id");
         const stateItem = location.state?.item || null;
 
-        // 1순위: 이전 페이지에서 넘겨준 stateItem이 있고 ID가 일치할 때 (즉시 렌더링용)
+        // 1순위: 이전 페이지에서 넘겨준 stateItem이 있고 ID가 일치할 때
         if (stateItem && (!id || String(stateItem.id) === String(id))) {
             setCurrent(stateItem);
-        } 
+        }
         // 2순위: URL ID를 기반으로 API에서 받아온 리스트(items)에서 찾기
         else if (id && items.length > 0) {
             const found = items.find((x) => String(x.id) === String(id));
@@ -145,7 +151,8 @@ export default function ClosetDetail() {
         if (!window.confirm("이 옷 정보를 정말 삭제할까요?")) return;
 
         try {
-            const res = await fetch(`http://localhost:3001/api/clothes/${current.id}`, {
+            // [수정] 상수(API_BASE_URL) 사용 및 백틱(`)으로 변경
+            const res = await fetch(`${API_BASE_URL}/api/clothes/${current.id}`, {
                 method: "DELETE",
             });
 
@@ -189,14 +196,14 @@ export default function ClosetDetail() {
         ),
         h("div", { className: "info" }, [
             h("h2", { className: "title" }, current.name || "(이름 없음)"),
-            
+
             // 태그 클릭 시 필터링 이동
             h("div", { className: "brand-type" }, [
                 current.brand && h("span", { className: "chip clickable", onClick: () => goFilter("brand", current.brand) }, current.brand),
                 current.type && h("span", { className: "chip clickable", onClick: () => goFilter("filter", current.type) }, current.type),
                 current.subType && h("span", { className: "chip clickable", onClick: () => goFilter("subType", current.subType) }, current.subType),
             ]),
-            
+
             h("div", { className: "meta-block" }, [
                 current.thickness && h("div", { className: "meta-line" }, [
                     h("span", { className: "meta-label" }, "두께감 "),
@@ -208,7 +215,7 @@ export default function ClosetDetail() {
                 ]),
             ]),
             ColorRow(current.colors),
-            
+
             h("div", { className: "meta-block secondary" }, [
                 h("div", { className: "meta-line" }, [
                     h("span", { className: "meta-label" }, "등록일 "),
@@ -217,7 +224,7 @@ export default function ClosetDetail() {
                     ),
                 ]),
             ]),
-            
+
             // 버튼 영역
             h("div", { className: "actions" }, [
                 h("button", { className: "btn", onClick: () => alert("수정 기능은 별도 구현 필요") }, "수정"),
@@ -242,7 +249,7 @@ export default function ClosetDetail() {
             h("button", {
                 id: "btnNavUpload",
                 className: "nav-upload-btn",
-                onClick: () => navigate("/closet/upload"), 
+                onClick: () => navigate("/closet/upload"),
             }, "옷 등록하기"),
         ]),
         h("div", { className: "nav-back-wrapper" },

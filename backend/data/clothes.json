@@ -1,5 +1,29 @@
 [
     {
+        "id": "1765812699979",
+        "name": "ㅋㅋ",
+        "type": "아우터",
+        "brand": "브랜드 미지정",
+        "subType": "",
+        "colors": [],
+        "thickness": "",
+        "features": [],
+        "imageUrl": "/images/cloths/cloth-1765812699449.jpg",
+        "createdAt": "2025-12-15T15:31:39.979Z"
+    },
+    {
+        "id": "1765812679801",
+        "name": "닭갈비",
+        "type": "아우터",
+        "brand": "브랜드 미지정",
+        "subType": "",
+        "colors": [],
+        "thickness": "",
+        "features": [],
+        "imageUrl": "/images/cloths/cloth-1765812678970.jpg",
+        "createdAt": "2025-12-15T15:31:19.801Z"
+    },
+    {
         "id": "1765802153905",
         "name": "1",
         "type": "아우터",

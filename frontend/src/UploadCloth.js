@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./UploadCloth.css";
+// [수정] 설정 파일에서 API 주소 가져오기
+import { API_BASE_URL } from "./apiConfig";
 
 const CLOTH_TYPES = ["아우터", "상의", "하의", "신발"];
 const THICKNESS_OPTIONS = ["", "얇음", "보통", "두꺼움"];
@@ -8,31 +10,27 @@ const THICKNESS_OPTIONS = ["", "얇음", "보통", "두꺼움"];
 export default function UploadCloth() {
     const navigate = useNavigate();
     
-    // 입력 상태 관리
     const [name, setName] = useState("");
     const [brand, setBrand] = useState("");
     const [type, setType] = useState(CLOTH_TYPES[0]);
     const [subType, setSubType] = useState("");
     const [thickness, setThickness] = useState(THICKNESS_OPTIONS[0]);
     const [colors, setColors] = useState("");
-    const [currentColor, setCurrentColor] = useState("#000000"); // 컬러 피커용
+    const [currentColor, setCurrentColor] = useState("#000000");
     const [features, setFeatures] = useState("");
     const [imageFile, setImageFile] = useState(null);
     
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
 
-    // 이미지 파일 선택 핸들러
     const handleFileChange = (e) => {
         setImageFile(e.target.files[0]);
     };
 
-    // 폼 제출 핸들러 (API 전송)
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage("");
 
-        // 기본 유효성 검사
         if (!name || !imageFile) {
             setMessage("옷 이름과 이미지를 모두 입력해주세요.");
             return;
@@ -40,7 +38,6 @@ export default function UploadCloth() {
 
         setLoading(true);
 
-        // 이미지 파일 전송을 위해 FormData 객체 사용 (JSON 아님)
         const formData = new FormData();
         formData.append("name", name);
         formData.append("type", type);
@@ -49,14 +46,15 @@ export default function UploadCloth() {
         formData.append("thickness", thickness || "");
         formData.append("colors", colors || "");
         formData.append("features", features || "");
-        formData.append("image", imageFile); // Multer 등 백엔드 미들웨어가 처리
+        formData.append("image", imageFile);
 
         try {
+            // [수정] 상수(API_BASE_URL)를 사용하여 주소 조합
             const res = await fetch(
-                "http://localhost:3001/api/clothes/upload",
+                `${API_BASE_URL}/api/clothes/upload`,
                 {
                     method: "POST",
-                    body: formData, // 헤더에 Content-Type 설정하지 말 것 (브라우저가 자동 설정)
+                    body: formData,
                 }
             );
 
@@ -64,11 +62,9 @@ export default function UploadCloth() {
 
             if (res.ok) {
                 setMessage(`옷 등록 성공: ${data.cloth.name}`);
-                // 폼 초기화
                 setName(""); setBrand(""); setSubType("");
                 setThickness(THICKNESS_OPTIONS[0]); setColors(""); setFeatures("");
                 setImageFile(null);
-                // 1.5초 뒤 목록 페이지로 이동
                 setTimeout(() => navigate("/closet"), 1500);
             } else {
                 setMessage(`등록 실패: ${data.error || "알 수 없는 오류"}`);
@@ -81,13 +77,11 @@ export default function UploadCloth() {
         }
     };
 
-    // JSX 렌더링
     return (
         <div className="upload-page">
             <h2>새 옷 등록</h2>
             <form onSubmit={handleSubmit} className="upload-form">
                 
-                {/* 이름 입력 */}
                 <div className="form-group">
                     <label htmlFor="name">옷 이름:</label>
                     <input
@@ -107,7 +101,6 @@ export default function UploadCloth() {
                     />
                 </div>
 
-                {/* 대분류 선택 */}
                 <div className="form-group">
                     <label htmlFor="type">분류:</label>
                     <select
@@ -143,7 +136,6 @@ export default function UploadCloth() {
                     </select>
                 </div>
 
-                {/* 색상 선택 (피커 + 텍스트) */}
                 <div className="form-group">
                     <label htmlFor="colors">색상 코드 (선택 사항, 콤마 구분):</label>
                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
@@ -180,7 +172,6 @@ export default function UploadCloth() {
                     />
                 </div>
 
-                {/* 이미지 업로드 */}
                 <div className="form-group">
                     <label htmlFor="image">사진:</label>
                     <input

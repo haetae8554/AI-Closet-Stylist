@@ -1,117 +1,200 @@
-.ai-page {
-    font-family: "Noto Sans KR", sans-serif;
-    color: #333;
-    padding: 20px;
+/* AIRecommend.css */
+
+/* 페이지 전체 레이아웃 (Navbar 폭에 맞춤) */
+.ai-container {
+    max-width: 1200px; /* Navbar와 동일한 너비 */
+    margin: 30px auto; /* 중앙 정렬 */
+    padding: 24px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); /* 메인 화면과 유사한 카드 스타일 */
 }
 
+/* 상단 설명 텍스트 */
+.page-header {
+    margin-bottom: 30px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 20px;
+}
+
+.page-header h2 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.page-header p {
+    color: #666;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+/* 카테고리 버튼 영역 */
 .category-bar {
     display: flex;
-    gap: 8px;
-    margin: 15px 0;
+    gap: 10px;
+    margin-bottom: 20px;
 }
 
 .cat-btn {
-    border: 1px solid #ccc;
-    background: #f8f8f8;
-    padding: 6px 12px;
-    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    background: #f8f9fa;
+    padding: 8px 16px;
+    border-radius: 20px; /* 둥근 버튼 스타일 */
     cursor: pointer;
-}
-.cat-btn.active {
-    background: #4a90e2;
-    color: white;
-    border-color: #4a90e2;
+    font-size: 14px;
+    font-weight: 500;
+    color: #555;
+    transition: all 0.2s;
 }
 
+.cat-btn:hover {
+    background: #eee;
+}
+
+.cat-btn.active {
+    background: #333; /* 활성화 시 검은색 (Navbar와 통일감) */
+    color: white;
+    border-color: #333;
+}
+
+/* 좌우 레이아웃 (옷 리스트 | 선택된 옷) */
 .ai-layout {
     display: flex;
-    gap: 20px;
+    gap: 24px;
     align-items: flex-start;
 }
 
+/* 옷 리스트 그리드 */
 .clothes-list {
-    flex: 2;
+    flex: 3; /* 공간을 좀 더 넓게 */
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
 }
 
 .cloth-card {
-    border: 1px solid #ddd;
-    border-radius: 8px;
+    border: 1px solid #eee;
+    border-radius: 12px;
     overflow: hidden;
     cursor: pointer;
     text-align: center;
-    transition: transform 0.1s;
-}
-.cloth-card:hover {
-    transform: scale(1.02);
-}
-.cloth-card.selected {
-    border-color: #4a90e2;
-    box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
-}
-.cloth-card img {
-    height: 100px;
-    object-fit: cover;
+    transition: transform 0.2s, box-shadow 0.2s;
+    background: #fff;
+    padding-bottom: 10px;
 }
 
-.selected-panel {
-    flex: 1;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    padding: 10px;
+.cloth-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.cloth-card.selected {
+    border: 2px solid #4a90e2;
+}
+
+.cloth-card img {
+    width: 100%;
+    height: 160px; /* 이미지 높이 고정 */
+    object-fit: cover;
+    margin-bottom: 8px;
     background: #fafafa;
 }
-.selected-panel img {
-    width: 60px;
-    height: 60px;
-    object-fit: cover;
-    border-radius: 5px;
+
+.cloth-card p {
+    margin: 0;
+    padding: 0 8px;
+    font-size: 14px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+
+/* 우측 선택된 옷 패널 */
+.selected-panel {
+    flex: 1; /* 좁게 */
+    min-width: 280px;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 20px;
+    background: #fafafa;
+    position: sticky; /* 스크롤 내려도 따라오게 */
+    top: 80px; 
+}
+
+.selected-panel h3 {
+    margin-bottom: 15px;
+    font-size: 18px;
+    color: #333;
+}
+
 .selected-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
+    gap: 12px;
+    margin-bottom: 12px;
+    background: #fff;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #eee;
 }
 
-/* 여기부터 X 버튼만 추가한 부분 */
+.selected-item img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+/* X 버튼 */
 .remove-btn {
-    background: rgba(0, 0, 0, 0.05);
+    margin-left: auto; /* 우측 끝으로 밀기 */
+    background: none;
     border: none;
-    color: #666;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    font-size: 14px;
-    line-height: 24px;
-    text-align: center;
+    color: #999;
+    font-size: 18px;
     cursor: pointer;
-    transition: all 0.2s ease;
 }
-.remove-btn:hover {
-    background: rgba(255, 80, 80, 0.15);
-    color: #e74c3c;
-    transform: scale(1.1);
-}
-.remove-btn:active {
-    background: rgba(255, 80, 80, 0.25);
-    transform: scale(0.95);
-}
-/* 여기까지 추가 */
 
+.remove-btn:hover {
+    color: #e74c3c;
+}
+
+/* 추천 버튼 */
 .recommend-btn {
+    width: 100%;
     margin-top: 20px;
-    padding: 10px 20px;
-    background: #4a90e2;
+    padding: 14px;
+    background: linear-gradient(90deg, #5865F2, #007bff);
     color: white;
     border: none;
-    border-radius: 6px;
-    font-size: 1rem;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
     cursor: pointer;
+    transition: 0.2s;
 }
+
+.recommend-btn:hover {
+    opacity: 0.9;
+    transform: scale(1.02);
+}
+
 .recommend-btn:disabled {
-    opacity: 0.6;
+    background: #ccc;
     cursor: not-allowed;
+    transform: none;
+}
+
+/* 반응형 처리 */
+@media (max-width: 768px) {
+    .ai-layout {
+        flex-direction: column;
+    }
+    .selected-panel {
+        width: 100%;
+        position: static;
+    }
 }

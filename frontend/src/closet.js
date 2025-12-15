@@ -2,12 +2,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./closet.css";
 
+// [수정] 설정 파일에서 API 주소 가져오기
+// (파일 위치에 따라 "./apiConfig" 또는 "../apiConfig"로 경로를 맞춰주세요)
+import { API_BASE_URL } from "./apiConfig";
+
 const h = React.createElement;
 const FILTERS = ["전체", "상의", "아우터", "하의", "신발"];
 const SORT_KEYS = ["정렬: 최신순", "정렬: 이름"];
 
 // API 데이터가 들쭉날쭉할 수 있어서 표준 포맷으로 맞춰주는 함수
-// 백엔드 응답 구조가 바뀌면 여기를 수정하세요.
 function normalizeItem(raw, idx = 0) {
     const id = String(raw?.id ?? Date.now() + "-" + idx);
     const type = String(raw?.type ?? "").trim();
@@ -77,8 +80,10 @@ export default function Closet() {
             try {
                 setLoading(true);
                 setLoadErr("");
-                // 포트번호나 경로 변경 시 수정 필요
-                const res = await fetch("http://localhost:3001/api/clothes");
+                
+                // [수정] 상수(API_BASE_URL)를 사용하여 주소 조합
+                const res = await fetch(`${API_BASE_URL}/api/clothes`);
+                
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 
@@ -190,7 +195,7 @@ export default function Closet() {
         h("div", { className: "left" },
             brandFilter ? `홈 / 옷장 / ${brandFilter}`
             : subTypeFilter ? `홈 / 옷장 / ${filter} / ${subTypeFilter}`
-            : featureFilter ? `홈 / 옷장 / #${featureFilter}`
+            : featureFilter ? `홈 / 옷장 / ${featureFilter}`
             : thicknessFilter ? `홈 / 옷장 / 두께감: ${thicknessFilter}`
             : `홈 / 옷장 / ${filter}`
         ),

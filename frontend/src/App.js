@@ -3,6 +3,9 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./App.css";
 
+// [수정 1] 설정 파일에서 API 주소 가져오기
+import { API_BASE_URL } from "./apiConfig";
+
 // ────────────────────────────────────────────────────────────────
 // [추가] 기상청 좌표 변환 함수 (위경도 -> 격자좌표)
 // ────────────────────────────────────────────────────────────────
@@ -243,6 +246,9 @@ function App() {
         setWeatherError("");
 
         // 좌표가 있으면 쿼리 파라미터로 전달, 없으면(null) 백엔드 기본값 사용
+        // [참고] 여기는 상대 경로(/api/weather/current)를 쓰고 있습니다.
+        // proxy 설정이 되어 있거나 같은 도메인이라면 이대로 두셔도 됩니다.
+        // 만약 이것도 분리하고 싶다면 `${API_BASE_URL}/api/weather/current`로 바꾸세요.
         let url = `/api/weather/current`;
         if (nx && ny) {
           url += `?nx=${nx}&ny=${ny}`;
@@ -290,7 +296,9 @@ function App() {
   useEffect(() => {
     async function fetchClothes() {
       try {
-        const res = await fetch("http://localhost:3001/api/clothes");
+        // [수정 2] 상수(API_BASE_URL)를 사용하여 주소를 조합
+        const res = await fetch(`${API_BASE_URL}/api/clothes`);
+        
         if (!res.ok) return;
         const data = await res.json();
         const normalized = (Array.isArray(data) ? data : []).map(normalizeItem);

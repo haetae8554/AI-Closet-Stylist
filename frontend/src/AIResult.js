@@ -37,11 +37,10 @@ export default function AIResult() {
                             코디 #{idx + 1}
                         </h3>
 
-                        {/* [추가된 부분] 추천 사유(Reason) 표시 */}
                         {combo.reason && (
                             <div
                                 style={{
-                                    backgroundColor: "#f0f8ff", // 연한 파랑 배경
+                                    backgroundColor: "#f0f8ff",
                                     padding: "12px",
                                     borderRadius: "8px",
                                     marginBottom: "20px",
@@ -50,11 +49,10 @@ export default function AIResult() {
                                     lineHeight: "1.5",
                                 }}
                             >
-                                💡 <strong>AI 코멘트:</strong> {combo.reason}
+                                <strong>AI 코멘트:</strong> {combo.reason}
                             </div>
                         )}
 
-                        {/* 가로 한 줄 정렬 */}
                         <div
                             className="result-clothes"
                             style={{
@@ -62,7 +60,7 @@ export default function AIResult() {
                                 justifyContent: "center",
                                 alignItems: "flex-start",
                                 gap: "30px",
-                                flexWrap: "wrap", // 화면 작으면 줄바꿈 되도록 수정 권장
+                                flexWrap: "wrap",
                             }}
                         >
                             {["outer", "top", "bottom", "shoes"].map((type) => {

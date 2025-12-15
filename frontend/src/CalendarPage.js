@@ -5,7 +5,7 @@ import "./App.css"; // 스타일은 App.css를 공유해서 사용
 export default function CalendarPage() {
     const navigate = useNavigate();
 
-    // ─────────────── [캘린더 상태 및 로직] ───────────────
+    // ──────────────── [캘린더 상태 및 로직] ────────────────
     const [viewDate, setViewDate] = useState(new Date());
     const [startDate, setStartDate] = useState(null);
     const [endDate, setEndDate] = useState(null);
@@ -36,7 +36,7 @@ export default function CalendarPage() {
         const startStr = `${startDate.getMonth() + 1}/${startDate.getDate()}`;
         if (!endDate) return `${startStr} ~ (종료일 선택)`;
         const endStr = `${endDate.getMonth() + 1}/${endDate.getDate()}`;
-        return `📅 선택된 기간: ${startStr} ~ ${endStr}`;
+        return `선택된 기간: ${startStr} ~ ${endStr}`;
     };
 
     const renderCalendarGrid = () => {
@@ -104,8 +104,8 @@ export default function CalendarPage() {
 
             {/* 캘린더 페이지 컨텐츠 */}
             <main className="page-container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
-                <h2>🗓️ 코디 캘린더</h2>
-                <p style={{marginBottom: '20px', color: '#666'}}>
+                <h2>코디 캘린더</h2>
+                <p style={{ marginBottom: '20px', color: '#666' }}>
                     원하는 날짜나 기간을 선택하여 AI 코디 추천을 받아보세요.
                 </p>
 
@@ -135,13 +135,13 @@ export default function CalendarPage() {
                     <div className="selected-range-info">
                         {getPeriodText()}
                     </div>
-                    
+
                     {/* 기간 선택 후 동작할 버튼 예시 */}
-                    <div style={{textAlign: 'center', marginTop: '20px'}}>
-                        <button 
+                    <div style={{ textAlign: 'center', marginTop: '20px' }}>
+                        <button
                             className="ai-recommend-btn"
                             disabled={!startDate || !endDate}
-                            style={{ opacity: (!startDate || !endDate) ? 0.5 : 1, cursor: (!startDate || !endDate) ? 'not-allowed' : 'pointer'}}
+                            style={{ opacity: (!startDate || !endDate) ? 0.5 : 1, cursor: (!startDate || !endDate) ? 'not-allowed' : 'pointer' }}
                             onClick={() => alert(`선택된 기간 (${getPeriodText()})으로 AI 추천을 시작합니다!`)}
                         >
                             선택한 기간으로 코디 추천받기
