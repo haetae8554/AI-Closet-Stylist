@@ -12,6 +12,7 @@
         "express": "^4.19.2",
         "firebase": "^12.5.0",
         "firebase-admin": "^12.3.0",
+        "multer": "^2.0.2",
         "node-fetch": "^3.3.2"
     }
 }
