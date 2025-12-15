@@ -1,4 +1,3 @@
-// src/AIResult.js
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -53,8 +52,8 @@ export default function AIResult() {
                                 const item = findClothById(combo[type]);
                                 const imageUrl =
                                     !item?.imageUrl ||
-                                        item.imageUrl.trim?.() === "" ||
-                                        item.imageUrl === "null"
+                                    item.imageUrl.trim?.() === "" ||
+                                    item.imageUrl === "null"
                                         ? "/images/placeholder.png"
                                         : item.imageUrl;
 

@@ -1,14 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import "./closet.css";
 
 const h = React.createElement;
 const FILTERS = ["전체", "상의", "아우터", "하의", "신발"];
 const SORT_KEYS = ["정렬: 최신순", "정렬: 이름"];
 
-// ────────────────────────────────
-// 데이터 정규화
-// ────────────────────────────────
 function normalizeItem(raw, idx = 0) {
     const id = String(raw?.id ?? Date.now() + "-" + idx);
     const type = String(raw?.type ?? "").trim();
@@ -16,18 +13,19 @@ function normalizeItem(raw, idx = 0) {
     const brand = String(raw?.brand ?? "").trim();
     const nameRaw = (raw?.name ?? "").trim();
     const name =
-        nameRaw || (brand && subType ? `${brand} ${subType}` : brand || subType || "");
+        nameRaw ||
+        (brand && subType ? `${brand} ${subType}` : brand || subType || "");
     const colors = Array.isArray(raw?.colors)
         ? raw.colors.map(String)
         : raw?.color
-            ? [String(raw.color)]
-            : [];
+        ? [String(raw.color)]
+        : [];
     const thickness = String(raw?.thickness ?? "").trim();
     const features = Array.isArray(raw?.features)
         ? raw.features.map((f) => f.trim())
         : raw?.feature
-            ? [String(raw.feature).trim()]
-            : [];
+        ? [String(raw.feature).trim()]
+        : [];
 
     let imageUrl = raw?.imageUrl;
     if (!imageUrl || imageUrl.trim?.() === "" || imageUrl === "null") {
@@ -49,21 +47,11 @@ function normalizeItem(raw, idx = 0) {
     };
 }
 
-// ────────────────────────────────
-// URL → 상태 복원 (+ 쿼리 없으면 전체 초기화)
-// ────────────────────────────────
 function restoreFromURL(search, setters) {
     const params = new URLSearchParams(search);
     const type = params.get("type");
     const value = params.get("value");
-
-    // 쿼리가 비어있으면 이전 필터를 모두 초기화
-    if (!type || !value) {
-        if (typeof setters.resetAll === "function") {
-            setters.resetAll();
-        }
-        return;
-    }
+    if (!type || !value) return;
 
     switch (type) {
         case "feature":
@@ -86,11 +74,8 @@ function restoreFromURL(search, setters) {
     }
 }
 
-// ────────────────────────────────
 export default function Closet() {
     const navigate = useNavigate();
-    const location = useLocation();
-
     const [sourceItems, setSourceItems] = useState([]);
     const [filter, setFilter] = useState("전체");
     const [sortKey, setSortKey] = useState("정렬: 최신순");
@@ -103,16 +88,17 @@ export default function Closet() {
     const [thicknessFilter, setThicknessFilter] = useState(null);
     const pageSize = 8;
 
-    // 데이터 로드
     useEffect(() => {
         (async () => {
             try {
                 setLoading(true);
                 setLoadErr("");
-                const res = await fetch("/data/clothes.json", { cache: "no-store" });
+                const res = await fetch("http://localhost:3001/api/clothes");
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
-                const normalized = (Array.isArray(data) ? data : []).map(normalizeItem);
+                const normalized = (Array.isArray(data) ? data : []).map(
+                    normalizeItem
+                );
                 setSourceItems(normalized);
             } catch (e) {
                 console.error(e);
@@ -123,69 +109,77 @@ export default function Closet() {
         })();
     }, []);
 
-    // 로컬스토리지에 목록 캐시(상세 단독 진입 대비)
     useEffect(() => {
-        if (sourceItems.length) {
-            localStorage.setItem("closet_items", JSON.stringify(sourceItems));
-        }
-    }, [sourceItems]);
+        const onPop = () => {
+            setFeatureFilter(null);
+            setSubTypeFilter(null);
+            setBrandFilter(null);
+            setThicknessFilter(null);
+            setFilter("전체");
 
-    // URL이 바뀔 때마다(뒤로가기 포함) 필터 상태 복원 + 스크롤 복원
-    useEffect(() => {
-        restoreFromURL(location.search, {
+            setTimeout(() => {
+                restoreFromURL(window.location.search, {
+                    setFeatureFilter,
+                    setSubTypeFilter,
+                    setBrandFilter,
+                    setThicknessFilter,
+                    setFilter,
+                });
+            }, 10);
+        };
+
+        window.addEventListener("popstate", onPop);
+
+        restoreFromURL(window.location.search, {
             setFeatureFilter,
             setSubTypeFilter,
             setBrandFilter,
             setThicknessFilter,
             setFilter,
-            // 쿼리 없을 때 전체 초기화
-            resetAll: () => {
-                setFilter("전체");
-                setFeatureFilter(null);
-                setSubTypeFilter(null);
-                setBrandFilter(null);
-                setThicknessFilter(null);
-                setPage(1);
-            },
         });
 
-        // 스크롤 복원(상세로 이동 전 현재 엔트리에 저장해둔 값)
-        const st = location.state;
-        if (st && typeof st.gridScrollY === "number") {
-            setTimeout(() => window.scrollTo(0, st.gridScrollY), 0);
-        }
-    }, [location.key, location.search]); // key 포함: 히스토리 스텝 이동시에도 반응
+        return () => window.removeEventListener("popstate", onPop);
+    }, []);
 
-    // 카테고리별 카운트
     const counts = useMemo(() => {
         const map = { 전체: sourceItems.length };
-        for (const t of FILTERS.slice(1)) map[t] = sourceItems.filter((i) => i.type === t).length;
+        for (const t of FILTERS.slice(1))
+            map[t] = sourceItems.filter((i) => i.type === t).length;
         return map;
     }, [sourceItems]);
 
-    // 필터링
     const filtered = useMemo(() => {
         let base = sourceItems;
         if (filter !== "전체") base = base.filter((i) => i.type === filter);
-        if (featureFilter) base = base.filter((i) => i.features.includes(featureFilter));
-        if (subTypeFilter) base = base.filter((i) => i.subType === subTypeFilter);
+        if (featureFilter)
+            base = base.filter((i) => i.features.includes(featureFilter));
+        if (subTypeFilter)
+            base = base.filter((i) => i.subType === subTypeFilter);
         if (brandFilter) base = base.filter((i) => i.brand === brandFilter);
-        if (thicknessFilter) base = base.filter((i) => i.thickness === thicknessFilter);
+        if (thicknessFilter)
+            base = base.filter((i) => i.thickness === thicknessFilter);
         return base;
-    }, [sourceItems, filter, featureFilter, subTypeFilter, brandFilter, thicknessFilter]);
+    }, [
+        sourceItems,
+        filter,
+        featureFilter,
+        subTypeFilter,
+        brandFilter,
+        thicknessFilter,
+    ]);
 
-    // 정렬
     const sorted = useMemo(() => {
         const arr = [...filtered];
         const map = {
-            "정렬: 최신순": (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
-            "정렬: 이름": (a, b) => String(a.name || "").localeCompare(String(b.name || ""), "ko"),
+            "정렬: 최신순": (a, b) =>
+                new Date(b.createdAt) - new Date(a.createdAt),
+            "정렬: 이름": (a, b) =>
+                String(a.name || "").localeCompare(String(b.name || ""), "ko"),
         };
         arr.sort(map[sortKey] || map["정렬: 최신순"]);
         return arr;
     }, [filtered, sortKey]);
 
-    // 페이지네이션
     const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
     const pageSafe = Math.min(Math.max(1, page), totalPages);
     const paged = useMemo(() => {
@@ -193,34 +187,18 @@ export default function Closet() {
         return sorted.slice(start, start + pageSize);
     }, [sorted, pageSafe]);
 
-    // 필터 변경 시 첫 페이지로
     useEffect(
         () => setPage(1),
-        [filter, sortKey, featureFilter, subTypeFilter, brandFilter, thicknessFilter]
+        [
+            filter,
+            sortKey,
+            featureFilter,
+            subTypeFilter,
+            brandFilter,
+            thicknessFilter,
+        ]
     );
 
-    // 상세 이동 헬퍼
-    function goDetail(item) {
-        // 현재 목록 엔트리의 state에 스크롤 위치 저장(replace)
-        navigate(
-            { pathname: location.pathname, search: location.search },
-            {
-                replace: true,
-                state: { gridScrollY: window.scrollY },
-            }
-        );
-
-        // 상세 페이지로 이동 (state에 item 포함)
-        navigate(`/closet_detail?id=${encodeURIComponent(item.id)}`, {
-            state: { item },
-        });
-    }
-
-    // URL search 변경 유틸
-    const goWithSearch = (search) =>
-        navigate({ pathname: "/closet", search }, { replace: false });
-
-    // ─────────────── NAV ───────────────
     const Nav = h("nav", { id: "nav3", role: "navigation" }, [
         h("a", { href: "/", className: "logo" }, "AI Closet"),
         h(
@@ -236,10 +214,10 @@ export default function Closet() {
                             href: "#",
                             className:
                                 filter === f &&
-                                    !featureFilter &&
-                                    !subTypeFilter &&
-                                    !brandFilter &&
-                                    !thicknessFilter
+                                !featureFilter &&
+                                !subTypeFilter &&
+                                !brandFilter &&
+                                !thicknessFilter
                                     ? "active"
                                     : undefined,
                             onClick: (e) => {
@@ -249,7 +227,13 @@ export default function Closet() {
                                 setSubTypeFilter(null);
                                 setBrandFilter(null);
                                 setThicknessFilter(null);
-                                goWithSearch(`?type=filter&value=${encodeURIComponent(f)}`);
+                                window.history.pushState(
+                                    {},
+                                    "",
+                                    `?type=filter&value=${encodeURIComponent(
+                                        f
+                                    )}`
+                                );
                             },
                         },
                         `${f} (${counts[f] || 0})`
@@ -262,13 +246,12 @@ export default function Closet() {
             {
                 id: "btnNavUpload",
                 className: "nav-upload-btn",
-                onClick: () => alert("옷 등록 기능은 준비 중입니다."),
+                onClick: () => navigate("/closet/upload"),
             },
             "옷 등록하기"
         ),
     ]);
 
-    // ─────────────── TOOLBAR ───────────────
     const Toolbar = h("section", { className: "toolbar" }, [
         h(
             "div",
@@ -276,12 +259,12 @@ export default function Closet() {
             brandFilter
                 ? `홈 / 옷장 / ${brandFilter}`
                 : subTypeFilter
-                    ? `홈 / 옷장 / ${filter} / ${subTypeFilter}`
-                    : featureFilter
-                        ? `홈 / 옷장 / #${featureFilter}`
-                        : thicknessFilter
-                            ? `홈 / 옷장 / 두께감: ${thicknessFilter}`
-                            : `홈 / 옷장 / ${filter}`
+                ? `홈 / 옷장 / ${filter} / ${subTypeFilter}`
+                : featureFilter
+                ? `홈 / 옷장 / #${featureFilter}`
+                : thicknessFilter
+                ? `홈 / 옷장 / 두께감: ${thicknessFilter}`
+                : `홈 / 옷장 / ${filter}`
         ),
         h(
             "div",
@@ -298,87 +281,69 @@ export default function Closet() {
         ),
     ]);
 
-    // ─────────────── CARD ───────────────
     const Card = (item) =>
         h("article", { key: item.id, className: "pcard" }, [
-            // 클릭 가능 영역(이미지 + 타이틀)
             h(
                 "div",
-                {
-                    className: "clickable-area",
-                    onClick: () => goDetail(item),
-                    role: "button",
-                    tabIndex: 0,
-                    onKeyDown: (e) => {
-                        if (e.key === "Enter" || e.key === " ") goDetail(item);
+                { className: "pthumb" },
+                h("img", {
+                    src: item.imageUrl,
+                    alt: item.name || "의류 이미지",
+                    loading: "lazy",
+                    onError: (e) => {
+                        e.target.src = "/images/placeholder.png";
                     },
-                },
-                [
-                    h(
-                        "div",
-                        { className: "pthumb" },
-                        h("img", {
-                            src: item.imageUrl || "/images/placeholder.png",
-                            alt: item.name || "의류 이미지",
-                            loading: "lazy",
-                            decoding: "async",
-                            onError: (e) => {
-                                const img = e.currentTarget;
-                                if (img.dataset.fallbackDone === "1") return; // 1회만
-                                img.dataset.fallbackDone = "1";
-                                img.src = "/images/placeholder.png";
-                            }
-                        })
-
-                    ),
-                    h("div", { className: "pmeta" }, [
-                        h(
-                            "div",
-                            {
-                                className: item.name ? "title" : "title empty-name",
-                            },
-                            item.name || "—"
-                        ),
-                    ]),
-                ]
+                })
             ),
-
-            // 브랜드(필터용) - 카드 클릭 전파 막기
-            h(
-                "div",
-                { className: "brand-row" },
+            h("div", { className: "pmeta" }, [
                 h(
-                    "span",
+                    "div",
                     {
                         className: "brand clickable",
-                        onClick: (e) => {
-                            e.stopPropagation();
+                        onClick: () => {
                             setBrandFilter(item.brand);
-                            goWithSearch(`?type=brand&value=${encodeURIComponent(item.brand)}`);
+                            window.history.pushState(
+                                {},
+                                "",
+                                `?type=brand&value=${encodeURIComponent(
+                                    item.brand
+                                )}`
+                            );
                         },
                     },
                     item.brand || "브랜드 미지정"
-                )
-            ),
+                ),
+                h(
+                    "div",
+                    {
+                        className: item.name ? "title" : "title empty-name",
+                    },
+                    item.name || "—"
+                ),
+            ]),
 
-            // 특징 / 소분류(필터용) - 전파 막기
             h(
                 "div",
                 { className: "badges" },
                 [
                     item.subType
                         ? h(
-                            "span",
-                            {
-                                className: "badge subtype",
-                                onClick: (e) => {
-                                    e.stopPropagation();
-                                    setSubTypeFilter(item.subType);
-                                    goWithSearch(`?type=subType&value=${encodeURIComponent(item.subType)}`);
-                                },
-                            },
-                            `#${item.subType}`
-                        )
+                              "span",
+                              {
+                                  className: "badge subtype",
+                                  onClick: () => {
+                                      setSubTypeFilter(item.subType);
+                                      window.history.pushState(
+                                          {},
+                                          "",
+                                          `?type=subType&value=${encodeURIComponent(
+                                              item.subType
+                                          )}`
+                                      );
+                                  },
+                              },
+                              `#${item.subType}`
+                          )
                         : null,
                     ...(item.features || []).map((f, i) =>
                         h(
@@ -386,10 +351,15 @@ export default function Closet() {
                             {
                                 key: i,
                                 className: "badge feature",
-                                onClick: (e) => {
-                                    e.stopPropagation();
+                                onClick: () => {
                                     setFeatureFilter(f);
-                                    goWithSearch(`?type=feature&value=${encodeURIComponent(f)}`);
+                                    window.history.pushState(
+                                        {},
+                                        "",
+                                        `?type=feature&value=${encodeURIComponent(
+                                            f
+                                        )}`
+                                    );
                                 },
                             },
                             `#${f}`
@@ -398,74 +368,91 @@ export default function Closet() {
                 ].filter(Boolean)
             ),
 
-            // 두께(필터용) - 전파 막기
             item.thickness
                 ? h(
-                    "div",
-                    { className: "thickness-row" },
-                    h(
-                        "span",
-                        {
-                            className: "thickness clickable",
-                            onClick: (e) => {
-                                e.stopPropagation();
-                                setThicknessFilter(item.thickness);
-                                goWithSearch(
-                                    `?type=thickness&value=${encodeURIComponent(item.thickness)}`
-                                );
-                            },
-                        },
-                        `두께감: ${item.thickness}`
-                    )
-                )
+                      "div",
+                      { className: "thickness-row" },
+                      h(
+                          "span",
+                          {
+                              className: "thickness clickable",
+                              onClick: () => {
+                                  setThicknessFilter(item.thickness);
+                                  window.history.pushState(
+                                      {},
+                                      "",
+                                      `?type=thickness&value=${encodeURIComponent(
+                                          item.thickness
+                                      )}`
+                                  );
+                              },
+                          },
+                          `두께감: ${item.thickness}`
+                      )
+                  )
                 : null,
 
-            // 색상칩(표시만)
             h(
                 "div",
                 { className: "colors" },
                 (item.colors || []).map((c, idx) =>
-                    h("span", { key: idx, className: "cchip", style: { background: c }, title: c })
+                    h("span", {
+                        key: idx,
+                        className: "cchip",
+                        style: { background: c },
+                        title: c,
+                    })
                 )
             ),
         ]);
 
-    // ─────────────── 본문 / 페이지 ───────────────
     const GridOrEmpty =
         sorted.length > 0
-            ? h("section", { id: "productGrid", className: "product-grid" }, paged.map(Card))
+            ? h(
+                  "section",
+                  { id: "productGrid", className: "product-grid" },
+                  paged.map(Card)
+              )
             : h(
-                "p",
-                { className: "empty-hint" },
-                loading ? "불러오는 중…" : loadErr || "불러온 옷이 없습니다."
-            );
+                  "p",
+                  { className: "empty-hint" },
+                  loading ? "불러오는 중…" : loadErr || "불러온 옷이 없습니다."
+              );
 
     const Pager =
         sorted.length > 0
             ? h("footer", { className: "pager" }, [
-                h(
-                    "button",
-                    {
-                        disabled: pageSafe <= 1,
-                        onClick: () => setPage((p) => Math.max(1, p - 1)),
-                    },
-                    "이전"
-                ),
-                h("span", { className: "page-info" }, `${pageSafe} / ${totalPages}`),
-                h(
-                    "button",
-                    {
-                        disabled: pageSafe >= totalPages,
-                        onClick: () => setPage((p) => Math.min(totalPages, p + 1)),
-                    },
-                    "다음"
-                ),
-            ])
+                  h(
+                      "button",
+                      {
+                          disabled: pageSafe <= 1,
+                          onClick: () => setPage((p) => Math.max(1, p - 1)),
+                      },
+                      "이전"
+                  ),
+                  h(
+                      "span",
+                      { className: "page-info" },
+                      `${pageSafe} / ${totalPages}`
+                  ),
+                  h(
+                      "button",
+                      {
+                          disabled: pageSafe >= totalPages,
+                          onClick: () =>
+                              setPage((p) => Math.min(totalPages, p + 1)),
+                      },
+                      "다음"
+                  ),
+              ])
             : null;
 
-    // ─────────────── 렌더링 ───────────────
     return h("div", { className: "closet-page" }, [
         Nav,
-        h("main", { className: "closet-container" }, [Toolbar, GridOrEmpty, Pager]),
+        h("main", { className: "closet-container" }, [
+            Toolbar,
+            GridOrEmpty,
+            Pager,
+        ]),
     ]);
 }

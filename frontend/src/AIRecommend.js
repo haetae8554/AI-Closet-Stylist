@@ -1,4 +1,3 @@
-// src/AIRecommend.js
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AIRecommend.css";
@@ -15,9 +14,9 @@ export default function AIRecommend() {
     const [category, setCategory] = useState("아우터");
     const [loading, setLoading] = useState(false);
 
-    //  public/data 폴더에서 clothes.json 불러오기
+    // public/data 폴더에서 clothes.json 불러오기
     useEffect(() => {
-        fetch("/data/clothes.json", { cache: "no-store" })
+        fetch("http://localhost:3001/api/clothes", { cache: "no-store" })
             .then((res) => res.json())
             .then((data) => {
                 console.log("🧥 옷 데이터 불러옴:", data);
@@ -45,7 +44,7 @@ export default function AIRecommend() {
             });
     }, []);
 
-    //  카테고리별 필터링 (한글 기준)
+    // 카테고리별 필터링 (한글 기준)
     const filteredClothes = allClothes.filter((item) => item.type === category);
 
     const handleSelect = (cloth) => {
@@ -63,7 +62,7 @@ export default function AIRecommend() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    clothes: allClothes, //  전체 옷 데이터
+                    clothes: allClothes, // 전체 옷 데이터
                     selected: selectedItems,
                 }),
             });
@@ -93,8 +92,9 @@ export default function AIRecommend() {
                 {["아우터", "상의", "하의", "신발"].map((cat) => (
                     <button
                         key={cat}
-                        className={`cat-btn ${category === cat ? "active" : ""
-                            }`}
+                        className={`cat-btn ${
+                            category === cat ? "active" : ""
+                        }`}
                         onClick={() => setCategory(cat)}
                     >
                         {cat}
@@ -107,10 +107,11 @@ export default function AIRecommend() {
                     {filteredClothes.map((cloth) => (
                         <div
                             key={cloth.id}
-                            className={`cloth-card ${selectedItems[category]?.id === cloth.id
+                            className={`cloth-card ${
+                                selectedItems[category]?.id === cloth.id
                                     ? "selected"
                                     : ""
-                                }`}
+                            }`}
                             onClick={() => handleSelect(cloth)}
                         >
                             <img
