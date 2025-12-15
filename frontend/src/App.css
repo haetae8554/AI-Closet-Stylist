@@ -1,38 +1,382 @@
-.App {
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+a {
+  text-decoration: none;
+  color: #ccc;
+  font-size: 15px;
+  transition: color .2s;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  padding-top: 60px;
+  background: #f5f5f5;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 60px;
+  background-color: #111;
+  border-bottom: 1px solid #222;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+}
+
+#nav3 {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ccc;
+}
+
+#nav3>a {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+}
+
+#nav3>ul {
+  display: flex;
+  gap: 25px;
+}
+
+#nav3>ul li a {
+  color: #ccc;
+}
+
+#nav3>ul li a:hover {
+  color: #fff;
+  border-bottom: 2px solid #fff;
+  padding-bottom: 2px;
+}
+
+#nav3>select {
+  padding: 3px 14px;
+  background-color: #111;
+  color: #ccc;
+  border: 1px solid #333;
+  border-radius: 20px;
+  outline: none;
+}
+
+#nav3>select:hover {
+  border-color: #fff;
+  color: #fff;
+}
+
+.clothes-area {
+  max-width: 1200px;
+  margin: 20px auto 0 auto;
+  padding: 24px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.registration-btn {
+  padding: 10px 18px;
+  font-size: 15px;
+  font-weight: bold;
+  color: #ccc;
+  background-color: #000;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.registration-btn:hover {
+  background-color: #333;
+}
+
+.main-dashboard {
+  display: flex;
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.random-clothes-section {
+  flex: 3;
+  background-color: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.weather-section {
+  flex: 1;
+  background-color: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.random-clothes-section h3,
+.weather-section h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.placeholder-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 500px;
+  background-color: #f9f9f9;
+  border: 2px dashed #ddd;
+  border-radius: 5px;
+  color: #aaa;
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.ai-section {
+  margin-top: 30px;
+  padding-top: 30px;
+  border-top: 1px solid #eaeaea;
+  text-align: center;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.ai-recommend-btn {
+  padding: 12px 30px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+  background: linear-gradient(90deg, #5865F2, #007bff);
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.ai-recommend-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
+}
+
+.ai-recommend-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 250px;
+  background-color: #f9f9f9;
+  border: 2px dashed #007bff;
+  border-radius: 8px;
+  color: #aaa;
+  font-size: 16px;
+  text-align: center;
+  padding: 20px;
+}
+
+/* 날씨 카드 */
+
+.weather-card {
+  text-align: center;
+  padding: 25px 20px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e6e6e6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.weather-icon {
+  font-size: 52px;
+  margin-bottom: 10px;
+}
+
+.weather-temp {
+  font-size: 42px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+.weather-summary {
+  font-size: 16px;
+  color: #555;
+  margin-bottom: 20px;
+}
+
+.weather-info-list {
+  text-align: left;
+  margin-top: 10px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed #eee;
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-row .label {
+  color: #666;
+  font-size: 14px;
+}
+
+.info-row .value {
+  color: #222;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 기준시각 표시 */
+
+.weather-basetime {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #888;
+  text-align: right;
+}
+
+/* 다음날 예보 리스트 */
+
+.weather-forecast-list {
+  margin-top: 18px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.forecast-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.forecast-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.forecast-emoji {
+  font-size: 24px;
+}
+
+.forecast-label {
+  font-size: 14px;
+  color: #555;
+}
+
+.forecast-right {
+  text-align: right;
+}
+
+.forecast-temp {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.forecast-sub {
+  font-size: 12px;
+  color: #777;
+}
+
+.forecast-rain {
+  margin-left: 4px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); 
+  gap: 12px;
+  width: 100%;
+}
+
+.mini-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
   display: flex;
   flex-direction: column;
+}
+
+.mini-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+}
+
+.mini-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #fafafa;
+  overflow: hidden;
+  display: flex;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
 }
 
-.App-link {
-  color: #61dafb;
+.mini-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
+.mini-info {
+  padding: 8px;
+  text-align: left;
+}
+
+.mini-brand {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 2px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-name {
+  display: block;
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

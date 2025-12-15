@@ -1,0 +1,117 @@
+.ai-page {
+    font-family: "Noto Sans KR", sans-serif;
+    color: #333;
+    padding: 20px;
+}
+
+.category-bar {
+    display: flex;
+    gap: 8px;
+    margin: 15px 0;
+}
+
+.cat-btn {
+    border: 1px solid #ccc;
+    background: #f8f8f8;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.cat-btn.active {
+    background: #4a90e2;
+    color: white;
+    border-color: #4a90e2;
+}
+
+.ai-layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.clothes-list {
+    flex: 2;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.cloth-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.1s;
+}
+.cloth-card:hover {
+    transform: scale(1.02);
+}
+.cloth-card.selected {
+    border-color: #4a90e2;
+    box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+}
+.cloth-card img {
+    height: 100px;
+    object-fit: cover;
+}
+
+.selected-panel {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 10px;
+    background: #fafafa;
+}
+.selected-panel img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 5px;
+}
+.selected-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+/* 여기부터 X 버튼만 추가한 부분 */
+.remove-btn {
+    background: rgba(0, 0, 0, 0.05);
+    border: none;
+    color: #666;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    font-size: 14px;
+    line-height: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.remove-btn:hover {
+    background: rgba(255, 80, 80, 0.15);
+    color: #e74c3c;
+    transform: scale(1.1);
+}
+.remove-btn:active {
+    background: rgba(255, 80, 80, 0.25);
+    transform: scale(0.95);
+}
+/* 여기까지 추가 */
+
+.recommend-btn {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+.recommend-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

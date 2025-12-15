@@ -1,0 +1,350 @@
+/* ─────────────── 기본 설정 ─────────────── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+a {
+  text-decoration: none;
+  color: #ccc;
+  font-size: 15px;
+  transition: color .2s;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  padding-top: 60px;
+  background: #f5f5f5;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+
+/* ─────────────── NAV ─────────────── */
+nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 60px;
+  background-color: #111;
+  border-bottom: 1px solid #222;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+}
+
+#nav3 {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ccc;
+}
+
+/* 왼쪽 로고 */
+#nav3>.logo {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+}
+
+/* 가운데 메뉴 */
+#nav3>ul {
+  display: flex;
+  gap: 25px;
+}
+
+#nav3>ul li a {
+  color: #ccc;
+}
+
+#nav3>ul li a:hover,
+#nav3>ul li a.active {
+  color: #fff;
+  border-bottom: 2px solid #fff;
+  padding-bottom: 2px;
+}
+
+/* 오른쪽 버튼 */
+#nav3>.nav-upload-btn {
+  padding: 6px 16px;
+  background-color: #111;
+  color: #ccc;
+  border: 1px solid #333;
+  border-radius: 20px;
+  outline: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+#nav3>.nav-upload-btn:hover {
+  border-color: #fff;
+  color: #fff;
+}
+
+/* 페이지 레이아웃 */
+.closet-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* 툴바 */
+.toolbar {
+  margin-top: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toolbar .right select {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* 그리드 */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* 카드 */
+.pcard {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform .12s ease-in-out, box-shadow .12s ease-in-out;
+}
+
+.pcard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .06);
+}
+
+.pthumb {
+  aspect-ratio: 1 / 1;
+  background: #f2f2f2;
+}
+
+.pthumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pmeta {
+  padding: 12px 12px 4px 12px;
+}
+
+.pmeta .brand {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.pmeta .title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #222;
+}
+
+/* 가격 */
+.pricebox {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px 12px 12px;
+}
+
+.pricebox .sale {
+  font-size: 12px;
+  font-weight: 700;
+  color: #e02424;
+}
+
+.pricebox .price {
+  font-size: 16px;
+  font-weight: 800;
+  color: #111;
+}
+
+.pricebox .origin {
+  font-size: 12px;
+  color: #aaa;
+  text-decoration: line-through;
+}
+
+/* 색상칩 */
+.colors {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 12px 12px;
+}
+
+.cchip {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid #ddd;
+}
+
+/* 빈 힌트 */
+.empty-hint {
+  text-align: center;
+  color: #666;
+  margin: 40px 0;
+}
+
+/* 페이지 하단 */
+.pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 40px;
+}
+
+.pager .page-info {
+  color: #333;
+}
+
+.pager button {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.pager button[disabled] {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* 반응형 */
+@media (max-width: 1024px) {
+  .product-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ─────────────── 확장 스타일 (추가) ─────────────── */
+
+/* 이름이 없을 때 */
+.title.empty-name {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* 브랜드 클릭 */
+.brand.clickable {
+  color: #2563eb;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.brand.clickable:hover {
+  text-decoration: underline;
+  color: #1e3a8a;
+}
+
+/* 소분류 (#후드티 등) */
+.badge.subtype {
+  color: #059669;
+  border: 1px solid #05966933;
+  background: #ecfdf5;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 12px;
+  margin-right: 4px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.badge.subtype:hover {
+  background: #d1fae5;
+  transform: scale(1.05);
+}
+
+/* 특징 (#기모 소재 등) */
+.badge.feature {
+  color: #2563eb;
+  border: 1px solid #2563eb33;
+  background: #eff6ff;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 12px;
+  margin-right: 4px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.badge.feature:hover {
+  background: #dbeafe;
+  transform: scale(1.05);
+}
+
+/* 두께감 표시 */
+.thickness-row {
+  margin-top: 4px;
+  margin-bottom: 6px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: #444;
+}
+
+.thickness.clickable {
+  color: #92400e;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.thickness.clickable:hover {
+  color: #78350f;
+  text-decoration: underline;
+}
+
+/* 미완성 정보 */
+.badge.warn {
+  background: #fff4e5;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+/* 공통 배지 */
+.badge {
+  display: inline-block;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 12px;
+  margin-right: 4px;
+}
