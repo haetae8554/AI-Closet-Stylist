@@ -76,7 +76,7 @@
     margin-bottom: 8px;
 }
 
-/* ✅ 여기부터 X 버튼만 추가한 부분 */
+/* 여기부터 X 버튼만 추가한 부분 */
 .remove-btn {
     background: rgba(0, 0, 0, 0.05);
     border: none;
@@ -99,7 +99,7 @@
     background: rgba(255, 80, 80, 0.25);
     transform: scale(0.95);
 }
-/* ✅ 여기까지 추가 */
+/* 여기까지 추가 */
 
 .recommend-btn {
     margin-top: 20px;

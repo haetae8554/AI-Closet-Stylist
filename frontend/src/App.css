@@ -380,3 +380,169 @@ nav {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+#nav3 > .nav-upload-btn {
+  padding: 6px 16px;
+  background-color: #111;
+  color: #ccc;
+  border: 1px solid #333;
+  border-radius: 20px;
+  outline: none;
+  cursor: pointer;
+  transition: 0.2s;
+  font-weight: 500; /* 폰트 굵기 살짝 추가 */
+}
+
+#nav3 > .nav-upload-btn:hover {
+  border-color: #fff;
+  color: #fff;
+}
+
+/* ─────────────── 캘린더 섹션 ─────────────── */
+.calendar-section {
+  margin-top: 24px;
+  background-color: #fff;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.calendar-section h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.calendar-container {
+  max-width: 800px;
+  margin: 0 auto;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 20px;
+  background: #fafafa;
+}
+
+/* 캘린더 헤더 (월 이동) */
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.calendar-header h4 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #333;
+}
+
+.calendar-header button {
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+.calendar-header button:hover {
+  background: #f0f0f0;
+}
+
+/* 요일 헤더 */
+.calendar-days-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.day-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #888;
+}
+
+.day-name.sun { color: #e02424; }
+.day-name.sat { color: #2563eb; }
+
+/* 날짜 그리드 */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.day-cell {
+  height: 80px; /* 높이를 줘서 일정 표시 공간 확보 */
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  transition: 0.2s;
+  position: relative;
+}
+
+.day-cell:hover {
+  border-color: #bbb;
+  transform: translateY(-2px);
+}
+
+.day-cell.empty {
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+
+.day-cell.empty:hover {
+  transform: none;
+}
+
+.day-number {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.day-cell.sun .day-number { color: #e02424; }
+.day-cell.sat .day-number { color: #2563eb; }
+
+/* 선택된 날짜 스타일 */
+.day-cell.selected {
+  background-color: #eff6ff;
+  border-color: #2563eb;
+}
+
+.day-cell.range-start,
+.day-cell.range-end {
+  background-color: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.day-cell.range-start .day-number,
+.day-cell.range-end .day-number {
+  color: #fff;
+}
+
+.day-cell.in-range {
+  background-color: #dbeafe; /* 연한 파랑 */
+  border-color: #bfdbfe;
+}
+
+/* 기간 정보 표시 */
+.selected-range-info {
+  margin-top: 15px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 10px;
+  border-radius: 8px;
+}

@@ -1,10 +1,10 @@
-
+import fetch from "node-fetch";
 import dotenv from "dotenv";
 dotenv.config();
 
 export async function getRecommendations(selected, clothes) {
     const API_KEY = process.env.GEMINI_API_KEY;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b-it:generateContent?key=${API_KEY}`;
 
     const prompt = `
 당신은 패션 코디 전문가입니다.
@@ -15,15 +15,18 @@ ${JSON.stringify(clothes, null, 2)}
 ${JSON.stringify(selected, null, 2)}
 
 규칙:
-1️⃣ 응답은 JSON 배열 형식이어야 합니다.
-2️⃣ 각 객체는 "outer", "top", "bottom", "shoes"의 id를 포함합니다.
-3️⃣ 선택된 항목은 그대로 두고, 나머지를 추천해주세요.
-4️⃣ 예시는 다음과 같습니다:
+1 응답은 JSON 배열 형식이어야 합니다.
+2 각 객체는 "outer", "top", "bottom", "shoes"의 id를 포함합니다.
+3 선택된 항목은 그대로 두고, 나머지를 추천해주세요.
+4 예시는 다음과 같습니다:
 [
   { "outer": "outer-001", "top": "top-003", "bottom": "pants-002", "shoes": "shoes-004" },
   { "outer": "outer-005", "top": "top-006", "bottom": "pants-007", "shoes": "shoes-008" }
 ]
-5️⃣ 설명 문장 없이 JSON만 출력하세요.
+5 설명 문장 없이 JSON만 출력하세요.
+6. 추천은 최대 4개까지 가능합니다.
+7. 선택된 항목이 없는 경우는 없습니다.
+추천을 시작하세요.
 `;
 
     const body = {

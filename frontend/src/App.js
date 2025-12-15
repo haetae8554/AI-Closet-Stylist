@@ -1,6 +1,6 @@
 // src/App.js
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import "./App.css";
 
 function normalizeItem(raw, idx = 0) {
@@ -101,6 +101,91 @@ function App() {
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [weatherError, setWeatherError] = useState("");
   const [randomClothes, setRandomClothes] = useState([]);
+  const [viewDate, setViewDate] = useState(new Date()); // 현재 보고 있는 달
+  const [startDate, setStartDate] = useState(null); // 기간 시작일
+  const [endDate, setEndDate] = useState(null);     // 기간 종료일
+
+  // [캘린더] 월 이동 함수
+  const changeMonth = (offset) => {
+    const newDate = new Date(viewDate);
+    newDate.setMonth(newDate.getMonth() + offset);
+    setViewDate(newDate);
+  };
+
+  // [캘린더] 날짜 클릭 핸들러 (기간 선택 로직)
+  const handleDateClick = (day) => {
+    const clickedDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+
+    // 1. 아무것도 선택 안된 경우 -> 시작일 설정
+    if (!startDate || (startDate && endDate)) {
+      setStartDate(clickedDate);
+      setEndDate(null);
+    } 
+    // 2. 시작일만 있는 경우 -> 종료일 설정 (단, 시작일보다 앞서면 시작일을 변경)
+    else if (startDate && !endDate) {
+      if (clickedDate < startDate) {
+        setStartDate(clickedDate);
+      } else {
+        setEndDate(clickedDate);
+      }
+    }
+  };
+
+  // [캘린더] 날짜 렌더링 헬퍼
+  const renderCalendarGrid = () => {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+
+    // 이번 달의 첫 날 요일 (0:일, 1:월 ...)
+    const firstDay = new Date(year, month, 1).getDay();
+    // 이번 달의 마지막 날짜
+    const lastDate = new Date(year, month + 1, 0).getDate();
+
+    const days = [];
+
+    // 빈 칸 채우기 (첫 주)
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="day-cell empty"></div>);
+    }
+
+    // 날짜 채우기
+    for (let day = 1; day <= lastDate; day++) {
+      const currentDate = new Date(year, month, day);
+      
+      // 스타일 결정을 위한 조건 확인
+      const isSun = currentDate.getDay() === 0;
+      const isSat = currentDate.getDay() === 6;
+      
+      // 선택 상태 확인
+      let className = "day-cell";
+      if (isSun) className += " sun";
+      if (isSat) className += " sat";
+
+      if (startDate && currentDate.getTime() === startDate.getTime()) className += " range-start";
+      else if (endDate && currentDate.getTime() === endDate.getTime()) className += " range-end";
+      else if (startDate && endDate && currentDate > startDate && currentDate < endDate) className += " in-range";
+
+      days.push(
+        <div 
+          key={day} 
+          className={className} 
+          onClick={() => handleDateClick(day)}
+        >
+          <span className="day-number">{day}</span>
+        </div>
+      );
+    }
+    return days;
+  };
+
+  // [캘린더] 선택된 기간 텍스트
+  const getPeriodText = () => {
+    if (!startDate) return "AI 추천을 받을 기간을 선택해주세요.";
+    const startStr = `${startDate.getMonth()+1}/${startDate.getDate()}`;
+    if (!endDate) return `${startStr} ~ (종료일 선택)`;
+    const endStr = `${endDate.getMonth()+1}/${endDate.getDate()}`;
+    return `📅 선택된 기간: ${startStr} ~ ${endStr}`;
+  };
 
   useEffect(() => {
     async function fetchWeather() {
@@ -130,7 +215,7 @@ function App() {
   useEffect(() => {
     async function fetchClothes() {
       try {
-        const res = await fetch("/data/clothes.json");
+        const res = await fetch("http://localhost:3001/api/clothes");
         if (!res.ok) return;
         const data = await res.json();
         const normalized = (Array.isArray(data) ? data : []).map(normalizeItem);
@@ -164,7 +249,6 @@ function App() {
     }
 
     const loc = weather.location || {};
-    const regId = weather.regId || "";
     const regionName =
       weather.regionName ||
       (weather.region && weather.region.name) ||
@@ -371,13 +455,18 @@ function App() {
       <nav id="nav3">
         <a href="/" className="logo">AI Closet</a>
         <ul>
-            <li><a href="#" onClick={(e)=>{e.preventDefault(); goToCloset();}}>옷장</a></li>
-            <li><a href="#" onClick={(e)=>{e.preventDefault(); goToAI();}}>AI 추천</a></li>
-            <li><a href="#">menu3</a></li>
-            <li><a href="#">menu4</a></li>
-            <li><a href="#">menu5</a></li>
+            <li><Link to="/closet">옷장</Link></li>
+            <li><Link to="/AI">AI 추천</Link></li>
+            <li><Link to="/calendar">캘린더</Link></li>
+            <li><a href="#!">menu4</a></li>
+            <li><a href="#!">menu5</a></li>
         </ul>
-        <select><option>=test=</option></select>
+        <button 
+          className="nav-upload-btn" 
+          onClick={() => navigate("/closet/upload")}
+        >
+          옷 등록하기
+        </button>
       </nav>
 
       <main className="clothes-area">
@@ -431,6 +520,40 @@ function App() {
             </div>
           </aside>
         </div>
+        {/* ─────────────── [추가] 캘린더 섹션 ─────────────── */}
+        <section className="calendar-section">
+          <h3>📅 AI 코디 캘린더 (기간 설정)</h3>
+
+          <div className="calendar-container">
+            {/* 1. 헤더: 년/월 이동 */}
+            <div className="calendar-header">
+              <button onClick={() => changeMonth(-1)}>◀ 이전 달</button>
+              <h4>{viewDate.getFullYear()}년 {viewDate.getMonth() + 1}월</h4>
+              <button onClick={() => changeMonth(1)}>다음 달 ▶</button>
+            </div>
+
+            {/* 2. 요일 헤더 */}
+            <div className="calendar-days-header">
+              <div className="day-name sun">일</div>
+              <div className="day-name">월</div>
+              <div className="day-name">화</div>
+              <div className="day-name">수</div>
+              <div className="day-name">목</div>
+              <div className="day-name">금</div>
+              <div className="day-name sat">토</div>
+            </div>
+
+            {/* 3. 날짜 그리드 */}
+            <div className="calendar-grid">
+              {renderCalendarGrid()}
+            </div>
+          </div>
+
+          <div className="selected-range-info">
+            {getPeriodText()}
+          </div>
+        </section>
+        {/* ──────────────────────────────────────────────── */}
 
         <section className="ai-section">
           <button className="ai-recommend-btn" onClick={goToAI}>
