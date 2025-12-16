@@ -183,7 +183,7 @@ export default function Closet() {
             </nav>
 
             <main className="closet-container">
-                {/* 2. Sub Navigation - 아래로 이동 */}
+                {/* 2. Sub Navigation (옷장 필터) - 아래로 이동 */}
                 <section className="category-tabs">
                     <ul>
                         {FILTERS.map((f) => {
