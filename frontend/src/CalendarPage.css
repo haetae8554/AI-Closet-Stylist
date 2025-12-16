@@ -1,0 +1,342 @@
+/* CalendarPage.css */
+
+.calendar-page-wrapper {
+    width: 100%;
+    min-height: 100vh;
+    background-color: #f5f5f5;
+    padding-top: 30px; /* 상단 여백 */
+}
+
+/* Navbar 너비(1200px)에 맞춤 */
+.calendar-main-container {
+    max-width: 1200px; /* 1000px -> 1200px로 변경 */
+    margin: 0 auto;    /* 중앙 정렬 */
+    padding: 24px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.cal-header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.cal-header h2 {
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.cal-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.cal-nav h3 {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.cal-nav button {
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+.cal-nav button:hover {
+    background: #f0f0f0;
+}
+
+/* 요일 헤더 */
+.cal-grid-header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    padding-bottom: 10px;
+    font-weight: bold;
+    color: #555;
+    border-bottom: 1px solid #eee;
+}
+
+.cal-grid-header .sun { color: #e02424; }
+.cal-grid-header .sat { color: #2563eb; }
+
+/* 날짜 그리드 */
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-left: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+}
+
+.cal-cell {
+    min-height: 120px; /* 높이를 늘려서 일정 텍스트 공간 확보 */
+    border-right: 1px solid #eee; /* 그리드 선 정리 */
+    border-top: 1px solid #eee;
+    background: #fff;
+    padding: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    overflow: hidden; /* 내용 넘침 방지 */
+}
+
+.cal-cell:hover {
+    background-color: #fafafa;
+}
+
+.cal-cell.empty {
+    background: transparent;
+    cursor: default;
+}
+
+.cal-cell.today {
+    background-color: #f0f7ff;
+}
+
+.cal-date-num {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.cal-cell.today .cal-date-num {
+    background-color: #2563eb;
+    color: white;
+}
+
+.cal-cell.sun .cal-date-num { color: #e02424; }
+.cal-cell.sat .cal-date-num { color: #2563eb; }
+.cal-cell.today.sun .cal-date-num, 
+.cal-cell.today.sat .cal-date-num { color: white; }
+
+/* [수정됨] 일정 텍스트 표시 스타일 */
+.cal-events-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.event-item-text {
+    font-size: 12px;
+    background-color: #e3f2fd;
+    color: #1565c0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+    font-weight: 500;
+}
+
+/* 모달 스타일 (기존 유지 + 일부 수정) */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: white;
+    width: 400px;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.event-list {
+    list-style: none;
+    padding: 0;
+    margin-bottom: 20px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.event-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px dashed #eee;
+}
+
+.add-event-box {
+    display: flex;
+    gap: 8px;
+}
+
+.add-event-box input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+}
+
+.add-event-box button {
+    padding: 8px 16px;
+    background: #333;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* 캘린더 날짜 셀 내의 추천 표시 */
+.rec-indicator {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+}
+
+.rec-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #10b981; /* 초록색 점 */
+    border-radius: 50%;
+}
+
+.rec-text {
+    font-size: 11px;
+    color: #10b981;
+    font-weight: bold;
+}
+
+/* 추천 기록이 있는 셀 호버 효과 */
+.result-cell:hover {
+    background-color: #ecfdf5; /* 연한 초록색 배경 */
+}
+
+/* 모달 크기 확장 */
+.modal-content.large-modal {
+    width: 900px;
+    max-width: 95vw;
+    max-height: 85vh;
+    padding: 40px;
+    overflow-y: auto;
+    border-radius: 16px;
+}
+
+/* 모달 내부 리스트 컨테이너 */
+.rec-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* 개별 추천 카드 */
+.rec-card {
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 16px;
+    background: #fafafa;
+}
+
+.rec-card-header {
+    margin-bottom: 12px;
+}
+
+.rec-badge {
+    background-color: #7c3aed;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* 옷 4개 그리드 (아우터, 상의, 하의, 신발) */
+.outfit-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.outfit-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.outfit-item img {
+    width: 110px;
+    height: 110px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    margin: 8px 0;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.role-badge {
+    font-size: 10px;
+    color: #666;
+    margin-bottom: 2px;
+}
+
+.cloth-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+    margin-top: 4px;
+}
+
+.no-info {
+    font-size: 11px;
+    color: #999;
+    padding: 20px 0;
+}
+
+.rec-reason {
+    font-size: 13px;
+    color: #444;
+    background: #fff;
+    padding: 10px;
+    border-radius: 6px;
+    line-height: 1.5;
+    border: 1px dashed #ccc;
+}

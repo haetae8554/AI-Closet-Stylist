@@ -1,51 +1,202 @@
 import fetch from "node-fetch";
 import dotenv from "dotenv";
+import { getWeatherByRequest } from "./WeatherService.js";
+import { getCalendarEvents } from "./CalendarService.js";
+
 dotenv.config();
 
-export async function getRecommendations(selected, clothes) {
+// Gemini 모델 및 설정
+const GEMINI_MODEL = "gemma-3-12b-it"; 
+const MAX_RETRIES = 3;
+
+// API 데이터 부재 시 추정 날씨 반환
+function getSeasonalWeather(date) {
+    const month = date.getMonth() + 1;
+    
+    if (month >= 3 && month <= 5) {
+        return "평균 기온 10~20도, 일교차가 큰 봄 날씨 예상";
+    } else if (month >= 6 && month <= 8) {
+        return "평균 기온 25~30도, 덥고 습한 여름 날씨 예상";
+    } else if (month >= 9 && month <= 11) {
+        return "평균 기온 10~20도, 선선한 가을 날씨 예상";
+    } else {
+        return "평균 기온 영하~5도, 춥고 건조한 겨울 날씨 예상";
+    }
+}
+
+// 컨텍스트 텍스트 생성
+async function formatContextForPrompt(weatherData, period) {
+    let resultString = "";
+    
+    const start = period?.start ? new Date(period.start) : new Date();
+    const end = period?.end ? new Date(period.end) : new Date();
+    
+    let allEvents = {};
+    try {
+        allEvents = await getCalendarEvents();
+    } catch (e) {
+        console.error("일정 로드 실패:", e);
+    }
+
+    const weatherItems = weatherData?.landFcst?.items || [];
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dateKey = `${year}-${month}-${day}`; 
+        const dateKeyNoHyphen = `${year}${month}${day}`;
+
+        // 일정 처리
+        const dayEvents = allEvents[dateKey] || [];
+        const eventText = dayEvents.length > 0 
+            ? `일정: ${dayEvents.map(e => e.title).join(", ")}` 
+            : "일정: 특별한 일정 없음 (평상복)";
+
+        // 날씨 처리
+        let weatherDesc = "";
+        const matchedWeathers = weatherItems.filter(item => {
+            const fcstDateRaw = item.tmEf || item.TM_EF || ""; 
+            return fcstDateRaw.startsWith(dateKeyNoHyphen);
+        });
+
+        if (matchedWeathers.length > 0) {
+            const temps = matchedWeathers
+                .map(it => Number(it.TA || it.ta || -99))
+                .filter(t => t > -99);
+            
+            const skyStatus = matchedWeathers[0].WF || matchedWeathers[0].wf || "맑음";
+            
+            if (temps.length > 0) {
+                const minT = Math.min(...temps);
+                const maxT = Math.max(...temps);
+                weatherDesc = `날씨(예보): 기온 ${minT}~${maxT}도, ${skyStatus}`;
+            } else {
+                weatherDesc = `날씨(예보): ${skyStatus}`;
+            }
+        } else {
+            const seasonal = getSeasonalWeather(d);
+            weatherDesc = `날씨(추정): 예보 데이터 없음. ${month}월 통계 기반 - ${seasonal}`;
+        }
+
+        resultString += `[${month}/${day} (${getDayName(d)})]\n  - ${weatherDesc}\n  - ${eventText}\n\n`;
+    }
+
+    const locationStr = weatherData?.location 
+        ? `위치: ${weatherData.location.city} ${weatherData.location.region}`
+        : "위치: 정보 없음";
+
+    return `사용자 현재 ${locationStr}\n\n${resultString}`;
+}
+
+function getDayName(date) {
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return days[date.getDay()];
+}
+
+// 옷 추천 메인 함수
+export async function getRecommendations(req, selected, clothes, period) {
     const API_KEY = process.env.GEMINI_API_KEY;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemma-3-4b-it:generateContent?key=${API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${API_KEY}`;
+
+    let weatherData = null;
+    try {
+        weatherData = await getWeatherByRequest(req);
+    } catch (error) {
+        console.error("WeatherService Error:", error);
+    }
+
+    const contextString = await formatContextForPrompt(weatherData, period);
+
+    const startDate = period?.start ? new Date(period.start) : new Date();
+    const endDate = period?.end ? new Date(period.end) : new Date();
+    const isSingleDay = startDate.toDateString() === endDate.toDateString();
+
+    const countInstruction = isSingleDay 
+        ? "현재 '단일 날짜' 요청입니다. 해당 날짜의 날씨와 TPO에 맞춰 **서로 다른 무드의 코디 조합을 3가지** 제안하세요."
+        : "현재 '여러 날짜' 요청입니다. **각 날짜별로 최적의 코디를 1개씩** 제안하세요.";
 
     const prompt = `
-당신은 패션 코디 전문가입니다.
-다음은 사용자가 보유한 옷 목록입니다 (JSON):
+당신은 최고의 AI 패션 스타일리스트입니다.
+아래 제공된 **[날짜별 상황]**을 면밀히 분석하여, 사용자가 가진 옷으로 가장 적절한 코디를 추천해주세요.
+
+========================================
+[날짜별 상황 (날씨 + 일정)]
+${contextString}
+
+[사용자 옷장 목록 (JSON)]
 ${JSON.stringify(clothes, null, 2)}
 
-사용자가 고정한 옷(없으면 null):
+[사용자 고정 아이템]
 ${JSON.stringify(selected, null, 2)}
+========================================
 
-규칙:
-1 응답은 JSON 배열 형식이어야 합니다.
-2 각 객체는 "outer", "top", "bottom", "shoes"의 id를 포함합니다.
-3 선택된 항목은 그대로 두고, 나머지를 추천해주세요.
-4 예시는 다음과 같습니다:
+[필수 규칙]
+1. 응답은 반드시 **JSON 배열** 형식이어야 합니다.
+2. **수량 규칙**: ${countInstruction}
+3. JSON 객체 구조:
+   {
+     "outer": "옷ID (없으면 null)",
+     "top": "옷ID",
+     "bottom": "옷ID",
+     "shoes": "옷ID",
+     "reason": "추천 이유 (날씨와 일정을 구체적으로 언급하여 한국어로 작성)"
+   }
+4. 날씨와 TPO(일정)를 최우선으로 고려하세요.
+5. 고정된 아이템이 있다면 절대 바꾸지 마세요.
+
+출력 예시:
 [
-  { "outer": "outer-001", "top": "top-003", "bottom": "pants-002", "shoes": "shoes-004" },
-  { "outer": "outer-005", "top": "top-006", "bottom": "pants-007", "shoes": "shoes-008" }
+  {
+    "outer": "coat-123",
+    "top": "knit-55",
+    "bottom": "jean-22",
+    "shoes": "boots-01",
+    "reason": "..."
+  }
 ]
-5 설명 문장 없이 JSON만 출력하세요.
-6. 추천은 최대 4개까지 가능합니다.
-7. 선택된 항목이 없는 경우는 없습니다.
-추천을 시작하세요.
 `;
 
     const body = {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
     };
 
-    const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
+    let attempt = 0;
+    while (attempt < MAX_RETRIES) {
+        try {
+            console.log(`[Gemini] 요청 시도 ${attempt + 1}`);
+            
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
 
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-    console.log("📥 Gemini 응답:", JSON.stringify(data, null, 2));
+            if (!res.ok) {
+                if (res.status >= 500 || res.status === 429) {
+                    throw new Error(`Server Error ${res.status}`);
+                }
+                return [];
+            }
 
-    // JSON만 추출
-    const jsonStart = text.indexOf("[");
-    const jsonEnd = text.lastIndexOf("]");
-    const jsonPart = text.slice(jsonStart, jsonEnd + 1);
-    return JSON.parse(jsonPart);
+            const data = await res.json();
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+            const jsonStart = text.indexOf("[");
+            const jsonEnd = text.lastIndexOf("]");
+
+            if (jsonStart === -1 || jsonEnd === -1) {
+                 throw new Error("Invalid JSON format");
+            }
+
+            const jsonPart = text.slice(jsonStart, jsonEnd + 1);
+            return JSON.parse(jsonPart);
+
+        } catch (error) {
+            attempt++;
+            console.error(`[Gemini] 오류:`, error.message);
+
+            if (attempt >= MAX_RETRIES) return [];
+            await new Promise(r => setTimeout(r, 1000 * attempt));
+        }
+    }
 }
