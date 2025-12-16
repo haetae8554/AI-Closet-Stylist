@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import "./App.css"; 
-import "./CalendarPage.css"; 
+import "./App.css";
+import "./CalendarPage.css";
 // [필수] apiConfig가 올바른 경로에 있는지 확인하세요.
 import { API_BASE_URL } from "./apiConfig";
 
@@ -9,13 +9,13 @@ export default function CalendarPage() {
     const navigate = useNavigate();
 
     // ─────────────── [상태 관리] ───────────────
-    const [viewDate, setViewDate] = useState(new Date()); 
-    const [selectedDate, setSelectedDate] = useState(null); 
-    const [isModalOpen, setIsModalOpen] = useState(false); 
-    
+    const [viewDate, setViewDate] = useState(new Date());
+    const [selectedDate, setSelectedDate] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
     // events 상태: API에서 불러온 데이터를 담음
     const [events, setEvents] = useState({});
-    const [newEventInput, setNewEventInput] = useState(""); 
+    const [newEventInput, setNewEventInput] = useState("");
 
     // [디버깅] API 주소 확인
     useEffect(() => {
@@ -63,7 +63,9 @@ export default function CalendarPage() {
             console.log("✅ [POST] 일정 저장 성공:", result);
         } catch (error) {
             console.error("❌ [POST] 통신 에러 발생:", error);
-            alert("서버와 통신할 수 없습니다. 백엔드가 켜져있는지 확인해주세요.");
+            alert(
+                "서버와 통신할 수 없습니다. 백엔드가 켜져있는지 확인해주세요."
+            );
         }
     };
 
@@ -75,17 +77,19 @@ export default function CalendarPage() {
     };
 
     const getDateKey = (year, month, day) => {
-        return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        return `${year}-${String(month + 1).padStart(2, "0")}-${String(
+            day
+        ).padStart(2, "0")}`;
     };
 
     const handleDateClick = (day) => {
         const year = viewDate.getFullYear();
         const month = viewDate.getMonth();
         const dateKey = getDateKey(year, month, day);
-        
+
         setSelectedDate({ year, month, day, dateKey });
         setIsModalOpen(true);
-        setNewEventInput(""); 
+        setNewEventInput("");
     };
 
     // ─────────────── [일정 추가/삭제 로직] ───────────────
@@ -103,24 +107,24 @@ export default function CalendarPage() {
         const currentDayEvents = events[dateKey] || [];
         const updatedEvents = {
             ...events,
-            [dateKey]: [...currentDayEvents, newEvent]
+            [dateKey]: [...currentDayEvents, newEvent],
         };
 
         setEvents(updatedEvents);
-        setNewEventInput(""); 
-        
+        setNewEventInput("");
+
         // 2. 서버 동기화
         saveEventsToServer(updatedEvents);
     };
 
     const handleDeleteEvent = (e, dateKey, id) => {
-        e.stopPropagation(); 
-        
+        e.stopPropagation();
+
         // 1. 상태 업데이트 (UI 즉시 반영)
         const updatedDayEvents = events[dateKey].filter((evt) => evt.id !== id);
         const updatedEvents = {
             ...events,
-            [dateKey]: updatedDayEvents
+            [dateKey]: updatedDayEvents,
         };
 
         setEvents(updatedEvents);
@@ -138,21 +142,23 @@ export default function CalendarPage() {
         const days = [];
 
         for (let i = 0; i < firstDay; i++) {
-            days.push(<div key={`empty-${i}`} className="cal-cell empty"></div>);
+            days.push(
+                <div key={`empty-${i}`} className="cal-cell empty"></div>
+            );
         }
 
         for (let day = 1; day <= lastDate; day++) {
             const dateKey = getDateKey(year, month, day);
             const dayEvents = events[dateKey] || [];
-            
+
             const currentDate = new Date(year, month, day);
             const isSun = currentDate.getDay() === 0;
             const isSat = currentDate.getDay() === 6;
-            
+
             let cellClass = "cal-cell";
             if (isSun) cellClass += " sun";
             if (isSat) cellClass += " sat";
-            
+
             const today = new Date();
             if (
                 today.getFullYear() === year &&
@@ -163,9 +169,13 @@ export default function CalendarPage() {
             }
 
             days.push(
-                <div key={day} className={cellClass} onClick={() => handleDateClick(day)}>
+                <div
+                    key={day}
+                    className={cellClass}
+                    onClick={() => handleDateClick(day)}
+                >
                     <div className="cal-date-num">{day}</div>
-                    
+
                     {/* 점 대신 텍스트 리스트 출력 */}
                     <div className="cal-events-list">
                         {dayEvents.map((evt) => (
@@ -183,16 +193,24 @@ export default function CalendarPage() {
     return (
         <div className="calendar-page-wrapper">
             <nav id="nav3">
-                <Link to="/" className="logo">AI Closet</Link>
+                <Link to="/" className="logo">
+                    AI Closet
+                </Link>
                 <ul>
-                    <li><Link to="/closet">옷장</Link></li>
-                    <li><Link to="/AI">AI 추천</Link></li>
-                    <li><Link to="/calendar" className="active">캘린더</Link></li>
-                    <li><a href="#!">menu4</a></li>
-                    <li><a href="#!">menu5</a></li>
+                    <li>
+                        <Link to="/closet">옷장</Link>
+                    </li>
+                    <li>
+                        <Link to="/AI">AI 추천</Link>
+                    </li>
+                    <li>
+                        <Link to="/calendar" className="active">
+                            캘린더
+                        </Link>
+                    </li>
                 </ul>
-                <button 
-                    className="nav-upload-btn" 
+                <button
+                    className="nav-upload-btn"
                     onClick={() => navigate("/closet/upload")}
                 >
                     옷 등록하기
@@ -207,9 +225,16 @@ export default function CalendarPage() {
 
                 <div className="cal-body">
                     <div className="cal-nav">
-                        <button onClick={() => changeMonth(-1)}>◀ 이전 달</button>
-                        <h3>{viewDate.getFullYear()}년 {viewDate.getMonth() + 1}월</h3>
-                        <button onClick={() => changeMonth(1)}>다음 달 ▶</button>
+                        <button onClick={() => changeMonth(-1)}>
+                            ◀ 이전 달
+                        </button>
+                        <h3>
+                            {viewDate.getFullYear()}년 {viewDate.getMonth() + 1}
+                            월
+                        </h3>
+                        <button onClick={() => changeMonth(1)}>
+                            다음 달 ▶
+                        </button>
                     </div>
 
                     <div className="cal-grid-header">
@@ -222,48 +247,81 @@ export default function CalendarPage() {
                         <div className="sat">토</div>
                     </div>
 
-                    <div className="cal-grid">
-                        {renderCalendarGrid()}
-                    </div>
+                    <div className="cal-grid">{renderCalendarGrid()}</div>
                 </div>
             </main>
 
             {/* 일정 추가/관리 모달 */}
             {isModalOpen && selectedDate && (
-                <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div
+                    className="modal-overlay"
+                    onClick={() => setIsModalOpen(false)}
+                >
+                    <div
+                        className="modal-content"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="modal-header">
                             <h3>
-                                {selectedDate.month + 1}월 {selectedDate.day}일 일정
+                                {selectedDate.month + 1}월 {selectedDate.day}일
+                                일정
                             </h3>
-                            <button className="close-btn" onClick={() => setIsModalOpen(false)}>✕</button>
+                            <button
+                                className="close-btn"
+                                onClick={() => setIsModalOpen(false)}
+                            >
+                                ✕
+                            </button>
                         </div>
-                        
+
                         <ul className="event-list">
                             {(events[selectedDate.dateKey] || []).length > 0 ? (
-                                (events[selectedDate.dateKey]).map((evt) => (
+                                events[selectedDate.dateKey].map((evt) => (
                                     <li key={evt.id}>
                                         <span>▪ {evt.title}</span>
-                                        <button 
-                                            style={{color:"#e74c3c", background:"none", border:"none", cursor:"pointer", fontWeight:"bold"}}
-                                            onClick={(e) => handleDeleteEvent(e, selectedDate.dateKey, evt.id)}
+                                        <button
+                                            style={{
+                                                color: "#e74c3c",
+                                                background: "none",
+                                                border: "none",
+                                                cursor: "pointer",
+                                                fontWeight: "bold",
+                                            }}
+                                            onClick={(e) =>
+                                                handleDeleteEvent(
+                                                    e,
+                                                    selectedDate.dateKey,
+                                                    evt.id
+                                                )
+                                            }
                                         >
                                             삭제
                                         </button>
                                     </li>
                                 ))
                             ) : (
-                                <li style={{color:"#999", justifyContent:"center"}}>일정이 없습니다.</li>
+                                <li
+                                    style={{
+                                        color: "#999",
+                                        justifyContent: "center",
+                                    }}
+                                >
+                                    일정이 없습니다.
+                                </li>
                             )}
                         </ul>
 
                         <div className="add-event-box">
-                            <input 
-                                type="text" 
-                                placeholder="일정 입력" 
+                            <input
+                                type="text"
+                                placeholder="일정 입력"
                                 value={newEventInput}
-                                onChange={(e) => setNewEventInput(e.target.value)}
-                                onKeyDown={(e) => { if(e.key === 'Enter') handleAddEvent(); }}
+                                onChange={(e) =>
+                                    setNewEventInput(e.target.value)
+                                }
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleAddEvent();
+                                }}
                             />
                             <button onClick={handleAddEvent}>추가</button>
                         </div>

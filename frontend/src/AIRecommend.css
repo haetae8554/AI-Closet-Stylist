@@ -87,7 +87,7 @@
 
 .cloth-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .cloth-card.selected {
@@ -121,7 +121,7 @@
     padding: 20px;
     background: #fafafa;
     position: sticky; /* 스크롤 내려도 따라오게 */
-    top: 80px; 
+    top: 80px;
 }
 
 .selected-panel h3 {
@@ -167,7 +167,7 @@
     width: 100%;
     margin-top: 20px;
     padding: 14px;
-    background: linear-gradient(90deg, #5865F2, #007bff);
+    background: linear-gradient(90deg, #5865f2, #007bff);
     color: white;
     border: none;
     border-radius: 8px;

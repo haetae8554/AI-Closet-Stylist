@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import "./UploadCloth.css";
-// [수정] 설정 파일에서 API 주소 가져오기
 import { API_BASE_URL } from "./apiConfig";
 
 const CLOTH_TYPES = ["아우터", "상의", "하의", "신발"];
@@ -9,7 +8,7 @@ const THICKNESS_OPTIONS = ["", "얇음", "보통", "두꺼움"];
 
 export default function UploadCloth() {
     const navigate = useNavigate();
-    
+
     const [name, setName] = useState("");
     const [brand, setBrand] = useState("");
     const [type, setType] = useState(CLOTH_TYPES[0]);
@@ -19,21 +18,18 @@ export default function UploadCloth() {
     const [currentColor, setCurrentColor] = useState("#000000");
     const [features, setFeatures] = useState("");
     const [imageFile, setImageFile] = useState(null);
-    
+
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
 
-    // 이미지 파일 선택 핸들러
     const handleFileChange = (e) => {
         setImageFile(e.target.files[0]);
     };
 
-    // 폼 제출 핸들러 (API 전송)
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage("");
 
-        // 기본 유효성 검사
         if (!name || !imageFile) {
             setMessage("옷 이름과 이미지를 모두 입력해주세요.");
             return;
@@ -41,7 +37,6 @@ export default function UploadCloth() {
 
         setLoading(true);
 
-        // 이미지 파일 전송을 위해 FormData 객체 사용 (JSON 아님)
         const formData = new FormData();
         formData.append("name", name);
         formData.append("type", type);
@@ -50,26 +45,25 @@ export default function UploadCloth() {
         formData.append("thickness", thickness || "");
         formData.append("colors", colors || "");
         formData.append("features", features || "");
-        formData.append("image", imageFile); // Multer 등 백엔드 미들웨어가 처리
+        formData.append("image", imageFile);
 
         try {
-            // [수정] 상수(API_BASE_URL)를 사용하여 주소 조합
-            const res = await fetch(
-                `${API_BASE_URL}/api/clothes/upload`,
-                {
-                    method: "POST",
-                    body: formData, // 헤더에 Content-Type 설정하지 말 것 (브라우저가 자동 설정)
-                }
-            );
+            const res = await fetch(`${API_BASE_URL}/api/clothes/upload`, {
+                method: "POST",
+                body: formData,
+            });
 
             const data = await res.json();
 
             if (res.ok) {
                 setMessage(`옷 등록 성공: ${data.cloth.name}`);
-                setName(""); setBrand(""); setSubType("");
-                setThickness(THICKNESS_OPTIONS[0]); setColors(""); setFeatures("");
+                setName("");
+                setBrand("");
+                setSubType("");
+                setThickness(THICKNESS_OPTIONS[0]);
+                setColors("");
+                setFeatures("");
                 setImageFile(null);
-                // 1.5초 뒤 목록 페이지로 이동
                 setTimeout(() => navigate("/closet"), 1500);
             } else {
                 setMessage(`등록 실패: ${data.error || "알 수 없는 오류"}`);
@@ -82,130 +76,203 @@ export default function UploadCloth() {
         }
     };
 
-    // JSX 렌더링
     return (
-        <div className="upload-page">
-            <h2>새 옷 등록</h2>
-            <form onSubmit={handleSubmit} className="upload-form">
-                
-                <div className="form-group">
-                    <label htmlFor="name">옷 이름:</label>
-                    <input
-                        id="name" type="text"
-                        value={name} onChange={(e) => setName(e.target.value)}
-                        placeholder="예: 레더 블루종 재킷"
-                        required disabled={loading}
-                    />
-                </div>
-
-                <div className="form-group">
-                    <label htmlFor="brand">브랜드 (선택 사항):</label>
-                    <input
-                        id="brand" type="text"
-                        value={brand} onChange={(e) => setBrand(e.target.value)}
-                        placeholder="예: 마크 곤잘레스" disabled={loading}
-                    />
-                </div>
-
-                {/* 대분류 선택 */}
-                <div className="form-group">
-                    <label htmlFor="type">분류:</label>
-                    <select
-                        id="type" value={type}
-                        onChange={(e) => setType(e.target.value)}
-                        required disabled={loading}
-                    >
-                        {CLOTH_TYPES.map((t) => (
-                            <option key={t} value={t}>{t}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <div className="form-group">
-                    <label htmlFor="subType">소분류 (선택 사항):</label>
-                    <input
-                        id="subType" type="text"
-                        value={subType} onChange={(e) => setSubType(e.target.value)}
-                        placeholder="예: 블루종, 와이드 팬츠" disabled={loading}
-                    />
-                </div>
-
-                <div className="form-group">
-                    <label htmlFor="thickness">두께감 (선택 사항):</label>
-                    <select
-                        id="thickness" value={thickness}
-                        onChange={(e) => setThickness(e.target.value)}
-                        disabled={loading}
-                    >
-                        {THICKNESS_OPTIONS.map((t) => (
-                            <option key={t} value={t}>{t || "선택 안 함"}</option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* 색상 선택 (피커 + 텍스트) */}
-                <div className="form-group">
-                    <label htmlFor="colors">색상 코드 (선택 사항, 콤마 구분):</label>
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                        <input
-                            type="color" value={currentColor}
-                            onChange={(e) => setCurrentColor(e.target.value)}
-                            style={{ height: "40px", width: "50px", padding: 0 }}
-                            disabled={loading}
-                        />
-                        <input
-                            id="colors" type="text"
-                            value={colors} onChange={(e) => setColors(e.target.value)}
-                            placeholder="#000000, #FFFFFF" disabled={loading}
-                        />
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setColors((prev) => (prev ? prev + ", " : "") + currentColor.toUpperCase());
-                            }}
-                            disabled={loading}
-                            style={{ padding: "8px 12px", flexShrink: 0 }}
-                        >
-                            추가
-                        </button>
-                    </div>
-                </div>
-
-                <div className="form-group">
-                    <label htmlFor="features">특징 (선택 사항, 콤마 구분):</label>
-                    <input
-                        id="features" type="text"
-                        value={features} onChange={(e) => setFeatures(e.target.value)}
-                        placeholder="예: 가죽, 스트리트" disabled={loading}
-                    />
-                </div>
-
-                {/* 이미지 업로드 */}
-                <div className="form-group">
-                    <label htmlFor="image">사진:</label>
-                    <input
-                        id="image" type="file" accept="image/*"
-                        onChange={handleFileChange}
-                        required disabled={loading}
-                    />
-                    {imageFile && (
-                        <p className="file-info">선택된 파일: {imageFile.name}</p>
-                    )}
-                </div>
-
-                {message && <p className="message-box">{message}</p>}
-
-                <button type="submit" disabled={loading} className="submit-btn">
-                    {loading ? "등록 중..." : "옷 등록하기"}
-                </button>
-
+        <>
+            <nav id="nav3">
+                <a href="/" className="logo">
+                    AI Closet
+                </a>
+                <ul>
+                    <li>
+                        <Link to="/closet">옷장</Link>
+                    </li>
+                    <li>
+                        <Link to="/AI">AI 추천</Link>
+                    </li>
+                    <li>
+                        <Link to="/calendar">캘린더</Link>
+                    </li>
+                </ul>
                 <button
-                    type="button" onClick={() => navigate("/closet")}
-                    className="back-btn"
+                    className="nav-upload-btn"
+                    onClick={() => navigate("/closet/upload")}
                 >
-                    취소 및 돌아가기
+                    옷 등록하기
                 </button>
-            </form>
-        </div>
+            </nav>
+
+            <div className="upload-page">
+                <h2>새 옷 등록</h2>
+                <form onSubmit={handleSubmit} className="upload-form">
+                    <div className="form-group">
+                        <label htmlFor="name">옷 이름:</label>
+                        <input
+                            id="name"
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="예: 레더 블루종 재킷"
+                            required
+                            disabled={loading}
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="brand">브랜드 (선택 사항):</label>
+                        <input
+                            id="brand"
+                            type="text"
+                            value={brand}
+                            onChange={(e) => setBrand(e.target.value)}
+                            placeholder="예: 마크 곤잘레스"
+                            disabled={loading}
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="type">분류:</label>
+                        <select
+                            id="type"
+                            value={type}
+                            onChange={(e) => setType(e.target.value)}
+                            required
+                            disabled={loading}
+                        >
+                            {CLOTH_TYPES.map((t) => (
+                                <option key={t} value={t}>
+                                    {t}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="subType">소분류 (선택 사항):</label>
+                        <input
+                            id="subType"
+                            type="text"
+                            value={subType}
+                            onChange={(e) => setSubType(e.target.value)}
+                            placeholder="예: 블루종, 와이드 팬츠"
+                            disabled={loading}
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="thickness">두께감 (선택 사항):</label>
+                        <select
+                            id="thickness"
+                            value={thickness}
+                            onChange={(e) => setThickness(e.target.value)}
+                            disabled={loading}
+                        >
+                            {THICKNESS_OPTIONS.map((t) => (
+                                <option key={t} value={t}>
+                                    {t || "선택 안 함"}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="colors">
+                            색상 코드 (선택 사항, 콤마 구분):
+                        </label>
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: "10px",
+                                alignItems: "center",
+                            }}
+                        >
+                            <input
+                                type="color"
+                                value={currentColor}
+                                onChange={(e) =>
+                                    setCurrentColor(e.target.value)
+                                }
+                                style={{
+                                    height: "40px",
+                                    width: "50px",
+                                    padding: 0,
+                                }}
+                                disabled={loading}
+                            />
+                            <input
+                                id="colors"
+                                type="text"
+                                value={colors}
+                                onChange={(e) => setColors(e.target.value)}
+                                placeholder="#000000, #FFFFFF"
+                                disabled={loading}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setColors(
+                                        (prev) =>
+                                            (prev ? prev + ", " : "") +
+                                            currentColor.toUpperCase()
+                                    );
+                                }}
+                                disabled={loading}
+                                style={{ padding: "8px 12px", flexShrink: 0 }}
+                            >
+                                추가
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="features">
+                            특징 (선택 사항, 콤마 구분):
+                        </label>
+                        <input
+                            id="features"
+                            type="text"
+                            value={features}
+                            onChange={(e) => setFeatures(e.target.value)}
+                            placeholder="예: 가죽, 스트리트"
+                            disabled={loading}
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="image">사진:</label>
+                        <input
+                            id="image"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            required
+                            disabled={loading}
+                        />
+                        {imageFile && (
+                            <p className="file-info">
+                                선택된 파일: {imageFile.name}
+                            </p>
+                        )}
+                    </div>
+
+                    {message && <p className="message-box">{message}</p>}
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="submit-btn"
+                    >
+                        {loading ? "등록 중..." : "옷 등록하기"}
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => navigate("/closet")}
+                        className="back-btn"
+                    >
+                        취소 및 돌아가기
+                    </button>
+                </form>
+            </div>
+        </>
     );
 }
