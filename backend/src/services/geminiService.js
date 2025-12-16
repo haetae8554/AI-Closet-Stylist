@@ -1,13 +1,20 @@
-import fetch from "node-fetch";
+import fetch from "node-fetch"; 
 import dotenv from "dotenv";
+import pg from "pg"; // 1. DB 연결을 위해 추가
 import { getWeatherByRequest } from "./WeatherService.js";
-import { getCalendarEvents } from "./CalendarService.js";
 
 dotenv.config();
+const { Pool } = pg;
+
+// 2. DB 연결 설정 (server.js와 동일한 환경변수 사용)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+});
 
 // Gemini 모델 및 설정
-const GEMINI_MODEL = "gemma-3-12b-it"; 
-const MAX_RETRIES = 3; // 키가 3개이므로 3회 시도와 매칭
+const GEMINI_MODEL = "gemma-3-12b-it"; // 또는 "gemini-1.5-flash" 등 사용 가능한 모델
+const MAX_RETRIES = 3; 
 
 // API 데이터 부재 시 추정 날씨 반환
 function getSeasonalWeather(date) {
@@ -31,11 +38,17 @@ async function formatContextForPrompt(weatherData, period) {
     const start = period?.start ? new Date(period.start) : new Date();
     const end = period?.end ? new Date(period.end) : new Date();
     
+    // 3. DB에서 캘린더 일정 가져오기 (기존 CalendarService 대체)
     let allEvents = {};
     try {
-        allEvents = await getCalendarEvents();
+        // server.js에서 저장한 방식(단일 row JSON)에 맞춰 조회
+        const res = await pool.query("SELECT data FROM calendar ORDER BY id DESC LIMIT 1");
+        if (res.rows.length > 0) {
+            allEvents = res.rows[0].data || {};
+        }
     } catch (e) {
-        console.error("일정 로드 실패:", e);
+        console.error("DB 일정 로드 실패:", e);
+        // DB 에러가 나도 날씨 기반 추천은 작동하도록 빈 객체 유지
     }
 
     const weatherItems = weatherData?.landFcst?.items || [];
@@ -94,7 +107,7 @@ function getDayName(date) {
     return days[date.getDay()];
 }
 
-// 옷 추천 메인 함수 (수정됨)
+// 옷 추천 메인 함수
 export async function getRecommendations(req, selected, clothes, period) {
     // API 키 배열 생성 (순서대로 1, 2, 3)
     const apiKeys = [
@@ -168,15 +181,13 @@ ${JSON.stringify(selected, null, 2)}
     let attempt = 0;
     while (attempt < MAX_RETRIES) {
         try {
-            // 현재 시도 횟수에 맞춰 키 선택 (0->Key1, 1->Key2, 2->Key3)
             const currentKey = apiKeys[attempt]; 
             
-            // 키가 없는 경우 대비 (Optional)
             if (!currentKey) {
+                // 키가 없으면 에러 발생 -> catch로 이동 -> 다음 키 시도
                 throw new Error(`API Key not found for attempt ${attempt + 1}`);
             }
 
-            // url 생성 로직을 루프 안으로 이동하여 동적 키 적용
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${currentKey}`;
             
             console.log(`[Gemini] 요청 시도 ${attempt + 1} (API Key ${attempt + 1} 사용)`);
@@ -188,14 +199,11 @@ ${JSON.stringify(selected, null, 2)}
             });
 
             if (!res.ok) {
-                // 429(Too Many Requests) 또는 503(Service Unavailable) 등 서버 에러 시
-                // 에러를 throw하여 catch 블록으로 이동 -> 다음 키로 재시도 유도
                 if (res.status === 429 || res.status >= 500) {
                     throw new Error(`Retryable Error: ${res.status}`);
                 }
-                // 그 외 클라이언트 에러(400 등)는 재시도 없이 종료
                 console.error(`[Gemini] 요청 실패: ${res.status}`);
-                return [];
+                return []; // 재시도 불가능한 에러(400 등)는 종료
             }
 
             const data = await res.json();
@@ -213,14 +221,13 @@ ${JSON.stringify(selected, null, 2)}
         } catch (error) {
             console.error(`[Gemini] 오류 발생 (시도 ${attempt + 1}):`, error.message);
             
-            attempt++; // 다음 시도(다음 키)로 이동
+            attempt++; 
 
             if (attempt >= MAX_RETRIES) {
                 console.error("[Gemini] 모든 API 키 시도 실패");
                 return [];
             }
             
-            // 재시도 전 잠시 대기 (Rate Limit 보호)
             await new Promise(r => setTimeout(r, 1000 * attempt));
         }
     }

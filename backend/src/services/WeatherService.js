@@ -1,5 +1,3 @@
-// backend/src/services/WeatherService.js
-
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
@@ -27,59 +25,33 @@ const DEFAULT_LOCATION = {
 // 예보 구역 기본값
 const DEFAULT_REG_ID = "11B10101";
 
-// 파일 경로
+// 파일 경로 (읽기 전용인 regions.json만 유지)
+// 주의: 배포 시 data/regions.json 파일이 깃허브에 올라가 있어야 합니다!
 const REGION_JSON_PATH = path.resolve(__dirname, "../../data/regions.json");
-const KMA_DATA_DIR = path.resolve(__dirname, "../../data/kma");
-const LAND_FCST_CACHE_PATH = path.join(KMA_DATA_DIR, "land_fcst.json");
 
 // 캐시 설정
 const LAND_TTL_MS = 3 * 60 * 60 * 1000;
 const LAND_FCST_BASE = "https://apihub.kma.go.kr/api/typ01/url/fct_afs_dl.php";
 const WARN_BASE = "https://apihub.kma.go.kr/api/typ01/url/wrn_reg.php";
 const LAND_COLS = [
-  "REG_ID",
-  "TM_FC",
-  "TM_EF",
-  "MOD",
-  "NE",
-  "STN",
-  "C",
-  "MAN_ID",
-  "MAN_FC",
-  "W1",
-  "T",
-  "W2",
-  "TA",
-  "ST",
-  "SKY",
-  "PREP",
-  "WF",
+  "REG_ID", "TM_FC", "TM_EF", "MOD", "NE", "STN", "C", "MAN_ID",
+  "MAN_FC", "W1", "T", "W2", "TA", "ST", "SKY", "PREP", "WF",
 ];
 const BASE_HOURS = [2, 5, 8, 11, 14, 17, 20, 23];
 
-let landCache = null;
+// [변경] 파일 대신 메모리(변수)에 캐시 저장
+// 서버가 꺼지면 사라지지만, 어차피 무료 서버 파일도 사라지므로 성능상 이득입니다.
+let landCache = {
+    lastUpdated: null,
+    regions: {}
+};
+
 let regionMeta = null;
 let schedulerStarted = false;
-
-// 디렉터리 생성
-if (!fs.existsSync(KMA_DATA_DIR)) {
-  fs.mkdirSync(KMA_DATA_DIR, { recursive: true });
-}
 
 // 숫자 두 자리
 function pad2(n) {
   return n < 10 ? "0" + n : String(n);
-}
-
-// 날짜 포맷
-function fmtDateTime(d, withMin = true) {
-  const y = d.getFullYear();
-  const m = pad2(d.getMonth() + 1);
-  const day = pad2(d.getDate());
-  const h = pad2(d.getHours());
-  if (!withMin) return `${y}${m}${day}${h}`;
-  const min = pad2(d.getMinutes());
-  return `${y}${m}${day}${h}${min}`;
 }
 
 // 최신 단기예보 기준시각 계산
@@ -186,34 +158,40 @@ export async function getLocationFromRequest(req) {
     };
   }
 
-  const url = `${GEO_API_BASE}${ip}?fields=status,country,regionName,city,lat,lon,query`;
+  // 무료 플랜 사용 시 http 요청 제한이 있을 수 있으니 예외처리 필요
+  try {
+      const url = `${GEO_API_BASE}${ip}?fields=status,country,regionName,city,lat,lon,query`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        return { ...DEFAULT_LOCATION, ip };
+      }
 
-  const res = await fetch(url);
-  if (!res.ok) {
-    return { ...DEFAULT_LOCATION, ip };
+      const data = await res.json();
+      if (data.status !== "success") {
+        return { ...DEFAULT_LOCATION, ip };
+      }
+
+      return {
+        ip: data.query,
+        country: data.country,
+        region: data.regionName,
+        city: data.city,
+        lat: data.lat,
+        lon: data.lon,
+      };
+  } catch (e) {
+      console.error("IP 위치 조회 실패:", e);
+      return { ...DEFAULT_LOCATION, ip };
   }
-
-  const data = await res.json();
-  if (data.status !== "success") {
-    return { ...DEFAULT_LOCATION, ip };
-  }
-
-  return {
-    ip: data.query,
-    country: data.country,
-    region: data.regionName,
-    city: data.city,
-    lat: data.lat,
-    lon: data.lon,
-  };
 }
 
-// regions.json 로드
+// regions.json 로드 (파일 읽기)
 function loadRegionMeta() {
   if (regionMeta) return;
 
+  // 배포 환경에서 파일이 없는 경우를 대비
   if (!fs.existsSync(REGION_JSON_PATH)) {
-    console.error("regions.json 파일 없음");
+    console.error("regions.json 파일 없음 - GitHub에 data 폴더가 올라갔는지 확인하세요.");
     regionMeta = {
       defaultRegId: DEFAULT_REG_ID,
       cityToRegId: {},
@@ -278,9 +256,8 @@ function resolveRegIdFromLocation(loc) {
   return regId;
 }
 
-// 단기예보 조회
+// 단기예보 API 호출
 async function fetchLandFcst(regId) {
-  // 필요하면 tmfc 사용 가능
   getLatestLandFcstTime();
 
   const params = new URLSearchParams({
@@ -302,7 +279,6 @@ async function fetchLandFcst(regId) {
   const parsed = await parseRes(res);
 
   const items = [];
-
   for (const line of parsed.lines) {
     const parts = line.split(/\s+/);
     if (parts.length < LAND_COLS.length) continue;
@@ -320,50 +296,17 @@ async function fetchLandFcst(regId) {
     items.push(o);
   }
 
-  console.log("[KMA] land 파싱 개수", items.length);
   return { regId, items, raw: parsed.raw };
 }
 
-// 캐시 로드
-function loadLandCacheFromFile() {
-  if (landCache) return;
-  if (!fs.existsSync(LAND_FCST_CACHE_PATH)) {
-    landCache = { lastUpdated: null, regions: {} };
-    return;
-  }
+// [변경] 파일 캐시 함수 삭제 (loadLandCacheFromFile, saveLandCacheToFile)
+// 대신 메모리 변수 landCache를 직접 사용
 
-  try {
-    const txt = fs.readFileSync(LAND_FCST_CACHE_PATH, "utf8");
-    const j = JSON.parse(txt);
-    landCache = {
-      lastUpdated: j.lastUpdated ?? null,
-      regions: j.regions ?? {},
-    };
-  } catch (e) {
-    console.error("[KMA] land 캐시 로드 실패", e);
-    landCache = { lastUpdated: null, regions: {} };
-  }
-}
-
-// 캐시 저장
-function saveLandCacheToFile() {
-  if (!landCache) return;
-  try {
-    fs.writeFileSync(
-      LAND_FCST_CACHE_PATH,
-      JSON.stringify(landCache, null, 2),
-      "utf8"
-    );
-  } catch (e) {
-    console.error("[KMA] land 캐시 저장 실패", e);
-  }
-}
-
-// regId 기준 단기예보 조회
+// regId 기준 단기예보 조회 (메모리 캐시 사용)
 async function getLandFcstByRegId(regId) {
   const now = Date.now();
-  loadLandCacheFromFile();
-
+  
+  // 메모리 캐시 확인
   const cached = landCache.regions?.[regId];
 
   if (
@@ -376,6 +319,7 @@ async function getLandFcstByRegId(regId) {
     return cached;
   }
 
+  // API 호출
   const data = await fetchLandFcst(regId);
   const info = getRegionInfoByRegId(regId);
 
@@ -386,15 +330,18 @@ async function getLandFcstByRegId(regId) {
     items: data.items,
   };
 
+  // 메모리에 저장
+  if (!landCache.regions) landCache.regions = {};
   landCache.regions[regId] = regionEntry;
   landCache.lastUpdated = now;
-  saveLandCacheToFile();
 
   return regionEntry;
 }
 
 // 특보 조회
 export async function getWarn() {
+  // 특보는 실시간성이 중요하므로 캐시 없이 호출하거나 짧은 캐시 적용
+  // 여기서는 기존 로직대로 매번 호출
   const url = `${WARN_BASE}?tmfc=0&authKey=${KMA_KEY}`;
   const parsed = await fetchKma("warn", url);
   return { data: parsed };
@@ -464,7 +411,7 @@ export function startWeatherScheduler() {
 
   loadRegionMeta();
 
-  console.log("[KMA] 스케줄러 초기 캐시 로딩");
+  console.log("[KMA] 스케줄러 초기 캐시 로딩 (메모리)");
 
   (async () => {
     try {
