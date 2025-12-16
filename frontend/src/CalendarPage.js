@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./App.css"; 
 import "./CalendarPage.css"; 
+// [필수] apiConfig가 올바른 경로에 있는지 확인하세요.
+import { API_BASE_URL } from "./apiConfig";
 
 export default function CalendarPage() {
     const navigate = useNavigate();
@@ -11,25 +13,59 @@ export default function CalendarPage() {
     const [selectedDate, setSelectedDate] = useState(null); 
     const [isModalOpen, setIsModalOpen] = useState(false); 
     
-    // [핵심] events 상태를 localStorage와 연동
+    // events 상태: API에서 불러온 데이터를 담음
     const [events, setEvents] = useState({});
     const [newEventInput, setNewEventInput] = useState(""); 
 
-    // 컴포넌트 로드 시 localStorage에서 일정 불러오기
+    // [디버깅] API 주소 확인
     useEffect(() => {
-        const savedEvents = localStorage.getItem("myCalendarEvents");
-        if (savedEvents) {
-            setEvents(JSON.parse(savedEvents));
-        }
+        console.log("🛠️ 현재 설정된 API URL:", API_BASE_URL);
     }, []);
 
-    // events 상태가 변경될 때마다 localStorage에 저장
+    // [1] 컴포넌트 로드 시 'Backend API'에서 일정 불러오기
     useEffect(() => {
-        // 빈 객체가 아닐 때 혹은 초기 로드 이후 저장
-        if (Object.keys(events).length >= 0) {
-            localStorage.setItem("myCalendarEvents", JSON.stringify(events));
+        console.log("📡 [GET] 일정 불러오기 시도...");
+        fetch(`${API_BASE_URL}/api/calendar`)
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error(`서버 응답 에러: ${res.status}`);
+                }
+                return res.json();
+            })
+            .then((data) => {
+                console.log("✅ [GET] 일정 불러오기 성공:", data);
+                setEvents(data);
+            })
+            .catch((err) => {
+                console.error("❌ [GET] 일정 불러오기 실패:", err);
+            });
+    }, []);
+
+    // [2] 변경된 이벤트를 서버에 저장하는 헬퍼 함수
+    const saveEventsToServer = async (updatedEvents) => {
+        const url = `${API_BASE_URL}/api/calendar`;
+        console.log(`📡 [POST] 일정 저장 시도: ${url}`);
+        console.log("📦 보낼 데이터:", updatedEvents);
+
+        try {
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updatedEvents),
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`저장 실패(${res.status}): ${errorText}`);
+            }
+
+            const result = await res.json();
+            console.log("✅ [POST] 일정 저장 성공:", result);
+        } catch (error) {
+            console.error("❌ [POST] 통신 에러 발생:", error);
+            alert("서버와 통신할 수 없습니다. 백엔드가 켜져있는지 확인해주세요.");
         }
-    }, [events]);
+    };
 
     // ─────────────── [날짜 계산 로직] ───────────────
     const changeMonth = (offset) => {
@@ -63,27 +99,34 @@ export default function CalendarPage() {
             title: newEventInput,
         };
 
-        setEvents((prev) => {
-            const currentDayEvents = prev[dateKey] || [];
-            return {
-                ...prev,
-                [dateKey]: [...currentDayEvents, newEvent]
-            };
-        });
+        // 1. 상태 업데이트 (UI 즉시 반영)
+        const currentDayEvents = events[dateKey] || [];
+        const updatedEvents = {
+            ...events,
+            [dateKey]: [...currentDayEvents, newEvent]
+        };
 
+        setEvents(updatedEvents);
         setNewEventInput(""); 
+        
+        // 2. 서버 동기화
+        saveEventsToServer(updatedEvents);
     };
 
     const handleDeleteEvent = (e, dateKey, id) => {
         e.stopPropagation(); 
-        setEvents((prev) => {
-            const updatedDayEvents = prev[dateKey].filter((evt) => evt.id !== id);
-            // 만약 일정이 다 지워지면 키 자체를 삭제할 수도 있지만, 빈 배열로 둬도 무방함
-            return {
-                ...prev,
-                [dateKey]: updatedDayEvents
-            };
-        });
+        
+        // 1. 상태 업데이트 (UI 즉시 반영)
+        const updatedDayEvents = events[dateKey].filter((evt) => evt.id !== id);
+        const updatedEvents = {
+            ...events,
+            [dateKey]: updatedDayEvents
+        };
+
+        setEvents(updatedEvents);
+
+        // 2. 서버 동기화
+        saveEventsToServer(updatedEvents);
     };
 
     // ─────────────── [렌더링 로직] ───────────────
@@ -123,7 +166,7 @@ export default function CalendarPage() {
                 <div key={day} className={cellClass} onClick={() => handleDateClick(day)}>
                     <div className="cal-date-num">{day}</div>
                     
-                    {/* [수정됨] 점 대신 텍스트 리스트 출력 */}
+                    {/* 점 대신 텍스트 리스트 출력 */}
                     <div className="cal-events-list">
                         {dayEvents.map((evt) => (
                             <div key={evt.id} className="event-item-text">

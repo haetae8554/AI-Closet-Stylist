@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import "./App.css";
+// [핵심] API 설정 파일 임포트
 import { API_BASE_URL } from "./apiConfig";
 
-
-
 // ────────────────────────────────────────────────────────────────
-// [추가] 기상청 좌표 변환 함수 (위경도 -> 격자좌표)
-// ────────────────────────────────────────────────────────────────
+// 좌표 변환 함수 (기존 유지)
 function dfs_xy_conv(code, v1, v2) {
   const RE = 6371.00877; // 지구 반경(km)
   const GRID = 5.0; // 격자 간격(km)
@@ -19,7 +17,7 @@ function dfs_xy_conv(code, v1, v2) {
   const YO = 136; // 기준점 Y좌표(GRID)
 
   const DEGRAD = Math.PI / 180.0;
-  const RADDEG = 180.0 / Math.PI;
+  // const RADDEG = 180.0 / Math.PI; // 사용 안 함
 
   const re = RE / GRID;
   const slat1 = SLAT1 * DEGRAD;
@@ -51,6 +49,7 @@ function dfs_xy_conv(code, v1, v2) {
 }
 // ────────────────────────────────────────────────────────────────
 
+// 헬퍼 함수들 (기존 유지)
 function normalizeItem(raw, idx = 0) {
   const id = String(raw?.id ?? Date.now() + "-" + idx);
   const brand = String(raw?.brand ?? "").trim();
@@ -123,12 +122,15 @@ export default function App() {
   const [viewDate, setViewDate] = useState(new Date()); 
   const [events, setEvents] = useState({});
 
+  // [수정됨] 캘린더 데이터: localStorage 대신 API 호출
   useEffect(() => {
-    const savedEvents = localStorage.getItem("myCalendarEvents");
-    if (savedEvents) {
-      try { setEvents(JSON.parse(savedEvents)); } 
-      catch (e) { console.error("일정 파싱 오류", e); }
-    }
+    fetch(`${API_BASE_URL}/api/calendar`)
+      .then(res => {
+        if(!res.ok) throw new Error("네트워크 응답 실패");
+        return res.json();
+      })
+      .then(data => setEvents(data))
+      .catch(e => console.error("일정 불러오기 실패", e));
   }, []);
 
   const getDateKey = (year, month, day) => {
@@ -162,6 +164,7 @@ export default function App() {
       const isSat = currentDate.getDay() === 6;
       
       const dateKey = getDateKey(year, month, day);
+      // events 객체에서 해당 날짜 키가 있고, 배열 길이가 0보다 크면 점 표시
       const hasEvent = events[dateKey] && events[dateKey].length > 0;
 
       let className = "day-cell";
@@ -181,15 +184,18 @@ export default function App() {
   };
 
   // ────────────────────────────────────────────────────────────────
-  // [수정] 날씨 조회: Geolocation -> 좌표변환 -> API 호출
+  // [수정] 날씨 조회: API_BASE_URL 적용
   // ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchWeather = async (nx, ny) => {
       try {
         setWeatherLoading(true);
         setWeatherError("");
-        let url = `/api/weather/current`;
+        
+        // [변경] API_BASE_URL 사용
+        let url = `${API_BASE_URL}/api/weather/current`;
         if (nx && ny) url += `?nx=${nx}&ny=${ny}`;
+        
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -220,9 +226,11 @@ export default function App() {
     }
   }, []);
 
+  // [수정] 옷 목록 조회: API_BASE_URL 적용
   useEffect(() => {
     async function fetchClothes() {
       try {
+        // [변경] API_BASE_URL 사용
         const res = await fetch(`${API_BASE_URL}/api/clothes`);
         if (!res.ok) return;
         const data = await res.json();
@@ -239,12 +247,11 @@ export default function App() {
   const goToCloset = () => navigate("/closet");
   const goToAI = () => navigate("/AI");
 
-  // [수정됨] 상세 페이지 이동 경로 수정 및 'from: home' 정보 전달
   const goToDetail = (item) => {
     navigate(`/closet/detail?id=${encodeURIComponent(item.id)}`, {
         state: { 
             item,
-            from: "home" // 메인 화면에서 왔음을 표시
+            from: "home"
         },
     });
   };
@@ -425,7 +432,7 @@ export default function App() {
             <div className="calendar-grid">{renderCalendarGrid()}</div>
           </div>
           <div className="selected-range-info" style={{background:"transparent", color:"#666", marginTop:"10px", textAlign:"center"}}>
-             👆 날짜를 클릭하여 상세 일정을 확인하고 추가하세요.
+              👆 날짜를 클릭하여 상세 일정을 확인하고 추가하세요.
           </div>
         </section>
 
