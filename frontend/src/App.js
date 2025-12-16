@@ -20,14 +20,26 @@ function normalizeItem(raw, idx = 0) {
 function pad2(n) { return n < 10 ? "0" + n : String(n); }
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
+// [수정됨] 날씨 아이콘 로직 개선 (텍스트 우선 확인)
 function getWeatherEmoji(skyCode, summaryText = "") {
   const code = String(skyCode || "");
   const text = String(summaryText || "");
-  if (code.includes("DB") || code.includes("RA") || text.includes("비")) return "🌧️";
-  if (code.includes("SN") || text.includes("눈")) return "❄️";
-  if (code === "1" || text.includes("맑")) return "☀️";
-  if (code === "2" || text.includes("구름")) return "⛅";
-  return "🌤️";
+
+  // 1. 텍스트에 '맑'이 있으면 무조건 해 ☀️ (가장 우선)
+  if (text.includes("맑")) return "☀️";
+  
+  // 2. 눈/비 텍스트 확인
+  if (text.includes("눈") || code.includes("SN")) return "❄️";
+  if (text.includes("비") || code.includes("RA") || code.includes("DB")) return "🌧️";
+  
+  // 3. 흐림/구름 확인
+  if (text.includes("흐") || text.includes("구름") || code === "3" || code === "4") return "☁️";
+
+  // 4. 나머지 코드 기반 처리
+  if (code === "1") return "☀️";
+  if (code === "2") return "⛅";
+  
+  return "🌤️"; // 기본값
 }
 
 function formatShortDate(date) {
@@ -198,6 +210,7 @@ export default function App() {
   const goToAI = () => navigate("/AI");
   const goToDetail = (item) => navigate(`/closet/detail?id=${encodeURIComponent(item.id)}`, { state: { item, from: "home" } });
 
+  // [수정됨] 날씨 렌더링 함수 (온도 처리 로직 개선)
   const renderWeather = () => {
     if (weatherLoading) return <p className="weather-message">날씨 정보 로딩 중...</p>;
     if (weatherError) return <p className="weather-message">{weatherError}</p>;
@@ -206,21 +219,30 @@ export default function App() {
     const loc = weather.location || {};
     const regionName = weather.regionName || loc.city || "내 위치";
     
-    let temp = weather.temp || weather.T1H; 
+    // 1. 기본값 설정
+    let temp = weather.temp;
     let summary = weather.wf || weather.summary || weather.skyStr;
     let skyCode = weather.sky || weather.SKY;
-    let pop = weather.prob || weather.pop || (weather.landFcst?.items?.[0]?.POP) || "0";
+    let pop = weather.prob || weather.pop || "0";
+
+    // 2. landFcst(단기예보) 데이터가 있을 경우 보정
+    if (weather.landFcst?.items?.[0]) {
+      const main = weather.landFcst.items[0];
+      
+      // [중요] temp가 없으면 T(현재기온)를 먼저 찾고, 없으면 TA(예상기온)를 찾음
+      // API 응답 첫 줄에는 보통 TA가 없고 T만 있는 경우가 많음
+      if (!temp) {
+         temp = main.T || main.TA; 
+      }
+      
+      if (!summary) summary = main.WF;
+      if (!skyCode) skyCode = main.SKY;
+      if (pop === "0" || !pop) pop = main.POP || "0";
+    }
 
     // 강수확률 이모지 조건 처리 (30% 이상일 때만 우산)
     const popVal = parseInt(pop, 10);
     const popEmoji = popVal >= 30 ? "☔" : "💧";
-
-    if (!temp && weather.landFcst?.items?.[0]) {
-      const main = weather.landFcst.items[0];
-      temp = main.TA;
-      summary = main.WF;
-      skyCode = main.SKY;
-    }
 
     const items = weather.landFcst?.items || [];
     const today = new Date();
@@ -231,6 +253,7 @@ export default function App() {
     const targetDays = [tomorrow, dayAfter];
     const forecastList = targetDays.map(date => {
       const dateStr = getYMD(date);
+      // 12시 데이터 우선, 없으면 첫번째 데이터
       const found = items.find(it => it.TM_EF?.startsWith(dateStr) && it.TM_EF?.endsWith("1200")) 
                  || items.find(it => it.TM_EF?.startsWith(dateStr));
       return { date, data: found };
@@ -239,6 +262,7 @@ export default function App() {
     return (
         <div className="weather-card">
             <div className="weather-icon">{getWeatherEmoji(skyCode, summary)}</div>
+            {/* 온도가 있으면 표시, 없으면 -- 표시 */}
             <div className="weather-temp">{Number(temp) > -99 ? `${temp}℃` : "--℃"}</div>
             
             <div className="weather-detail-row">
@@ -254,12 +278,13 @@ export default function App() {
                   <div key={idx} className="forecast-item">
                     <div className="forecast-left">
                       <span className="forecast-label">{formatShortDate(fv.date)}</span>
-                      {/* 내일/모레 상세 날씨 텍스트 추가 */}
                       <span className="forecast-desc">{fv.data.WF}</span>
                     </div>
                     <div className="forecast-right">
+                      {/* [수정] 텍스트(WF) 전달하여 아이콘 정확도 향상 */}
                       <span className="forecast-emoji">{getWeatherEmoji(fv.data.SKY, fv.data.WF)}</span>
-                      <span className="forecast-temp">{fv.data.TA}℃</span>
+                      {/* [수정] TA가 없으면 T 표시 */}
+                      <span className="forecast-temp">{fv.data.TA || fv.data.T}℃</span>
                     </div>
                   </div>
                 ))}
