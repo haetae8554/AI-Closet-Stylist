@@ -11,20 +11,15 @@ export default function AIResult() {
 
     return (
         <>
+            {/* [수정] Navbar 5개 메뉴 적용 및 '추천 결과' 활성화 */}
             <nav id="nav3">
-                <a href="/" className="logo">
-                    AI Closet
-                </a>
+                <Link to="/" className="logo">AI Closet</Link>
                 <ul>
-                    <li>
-                        <Link to="/closet">옷장</Link>
-                    </li>
-                    <li>
-                        <Link to="/AI">AI 추천</Link>
-                    </li>
-                    <li>
-                        <Link to="/calendar">캘린더</Link>
-                    </li>
+                    <li><Link to="/">메인</Link></li>
+                    <li><Link to="/closet">옷장</Link></li>
+                    <li><Link to="/AI">AI 추천</Link></li>
+                    <li><Link to="/calendar">캘린더</Link></li>
+                    <li><Link to="/AI/result" className="active">추천 결과</Link></li>
                 </ul>
                 <button
                     className="nav-upload-btn"

@@ -6,19 +6,17 @@ import { API_BASE_URL } from "./apiConfig";
 
 // ────────────────────────────────────────────────────────────────
 // 좌표 변환 함수
-// (참고: 백엔드가 위도/경도를 직접 처리하게 변경되었으므로, 현재 로직에서는 사용되지 않으나 코드는 유지합니다)
 function dfs_xy_conv(code, v1, v2) {
-  const RE = 6371.00877; // 지구 반경(km)
-  const GRID = 5.0; // 격자 간격(km)
-  const SLAT1 = 30.0; // 투영 위도1(degree)
-  const SLAT2 = 60.0; // 투영 위도2(degree)
-  const OLON = 126.0; // 기준점 경도(degree)
-  const OLAT = 38.0; // 기준점 위도(degree)
-  const XO = 43; // 기준점 X좌표(GRID)
-  const YO = 136; // 기준점 Y좌표(GRID)
+  const RE = 6371.00877; 
+  const GRID = 5.0; 
+  const SLAT1 = 30.0; 
+  const SLAT2 = 60.0; 
+  const OLON = 126.0; 
+  const OLAT = 38.0; 
+  const XO = 43; 
+  const YO = 136; 
 
   const DEGRAD = Math.PI / 180.0;
-  // const RADDEG = 180.0 / Math.PI; // 사용 안 함
 
   const re = RE / GRID;
   const slat1 = SLAT1 * DEGRAD;
@@ -50,7 +48,7 @@ function dfs_xy_conv(code, v1, v2) {
 }
 // ────────────────────────────────────────────────────────────────
 
-// 헬퍼 함수들 (기존 유지)
+// 헬퍼 함수들
 function normalizeItem(raw, idx = 0) {
   const id = String(raw?.id ?? Date.now() + "-" + idx);
   const brand = String(raw?.brand ?? "").trim();
@@ -165,37 +163,43 @@ export default function App() {
       const isSat = currentDate.getDay() === 6;
       
       const dateKey = getDateKey(year, month, day);
-      const hasEvent = events[dateKey] && events[dateKey].length > 0;
+      const dayEvents = events[dateKey] || [];
 
       let className = "day-cell";
       if (isSun) className += " sun";
       if (isSat) className += " sat";
 
       days.push(
-        <div key={day} className={className} onClick={handleDateClick} title="클릭하여 상세 일정 관리" style={{ position: "relative", cursor: "pointer" }}>
-          <span className="day-number">{day}</span>
-          {hasEvent && (
-            <div style={{ width: "6px", height: "6px", backgroundColor: "#4a90e2", borderRadius: "50%", margin: "4px auto 0 auto" }}></div>
-          )}
+        <div 
+          key={day} 
+          className={className} 
+          onClick={handleDateClick} 
+          title="클릭하여 상세 일정 관리" 
+          style={{ position: "relative", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "stretch", padding: "2px" }}
+        >
+          <span className="day-number" style={{ alignSelf: "flex-start", fontSize: "0.8rem", marginBottom: "2px" }}>{day}</span>
+          
+          <div className="main-cal-events">
+            {dayEvents.slice(0, 3).map((evt) => (
+                <div key={evt.id} className="main-event-text">
+                    {evt.title}
+                </div>
+            ))}
+            {dayEvents.length > 3 && <div className="main-event-more">+</div>}
+          </div>
         </div>
       );
     }
     return days;
   };
 
-  // ────────────────────────────────────────────────────────────────
-  // [수정됨] 날씨 조회 로직
-  // 1. 먼저 기본값(서울)을 호출하여 화면에 즉시 표시
-  // 2. 위치 권한 허용 시 해당 좌표(lat, lon)로 다시 호출하여 갱신
-  // ────────────────────────────────────────────────────────────────
+  // 날씨 조회 로직
   useEffect(() => {
     const fetchWeather = async (lat, lon) => {
       try {
-        // 이미 날씨 데이터가 있으면(기본값 로딩 후 갱신 시) 로딩 스피너 생략
         if (!weather) setWeatherLoading(true);
         setWeatherError("");
         
-        // [중요] 백엔드 WeatherService는 'lat', 'lon' 파라미터를 받습니다. (nx, ny 아님)
         let url = `${API_BASE_URL}/api/weather/current`;
         if (lat && lon) {
            url += `?lat=${lat}&lon=${lon}`;
@@ -215,17 +219,13 @@ export default function App() {
       }
     };
 
-    // 1. [즉시 실행] 좌표 없이 호출 -> 백엔드가 설정한 기본값(서울) 가져옴
     fetchWeather(null, null);
 
-    // 2. [비동기 실행] 브라우저 위치 정보 확인
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          // 성공 시: 위도/경도를 그대로 백엔드에 전송
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
-          
           console.log(`📍 사용자 위치 확보: ${lat}, ${lon} -> 날씨 업데이트 시도`);
           fetchWeather(lat, lon);
         },
@@ -233,12 +233,10 @@ export default function App() {
           console.warn("⚠️ 위치 정보 권한 거부 또는 에러 (기본 서울 날씨 유지)", error);
         }
       );
-    } else {
-       console.log("🚫 Geolocation 미지원 브라우저");
     }
   }, []);
 
-  // 옷 목록 조회 (기존 유지)
+  // 옷 목록 조회
   useEffect(() => {
     async function fetchClothes() {
       try {
@@ -387,12 +385,46 @@ export default function App() {
 
   return (
     <>
+      <style>{`
+          .main-cal-events {
+              display: flex;
+              flex-direction: column;
+              gap: 2px;
+              margin-top: 2px;
+              overflow: hidden;
+              width: 100%;
+          }
+          .main-event-text {
+              font-size: 0.65rem;
+              background-color: #ebf5ff;
+              color: #1e40af;
+              padding: 1px 3px;
+              border-radius: 3px;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              text-align: left;
+          }
+          .main-event-more {
+              font-size: 0.6rem;
+              color: #999;
+              text-align: center;
+              line-height: 1;
+          }
+          .calendar-grid .day-cell {
+              min-height: 60px;
+          }
+      `}</style>
+
+      {/* [수정] 5개 메뉴 Navbar */}
       <nav id="nav3">
-        <a href="/" className="logo">AI Closet</a>
+        <Link to="/" className="logo">AI Closet</Link>
         <ul>
+            <li><Link to="/" className="active">메인</Link></li>
             <li><Link to="/closet">옷장</Link></li>
             <li><Link to="/AI">AI 추천</Link></li>
             <li><Link to="/calendar">캘린더</Link></li>
+            <li><Link to="/AI/result">추천 결과</Link></li>
         </ul>
         <button className="nav-upload-btn" onClick={() => navigate("/closet/upload")}>옷 등록하기</button>
       </nav>
