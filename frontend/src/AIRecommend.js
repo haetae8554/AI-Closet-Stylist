@@ -192,7 +192,8 @@ export default function AIRecommend() {
 
             const data = await res.json();
 
-            navigate("/AI/result", {
+            // [수정됨] 결과 확인 페이지(/AI/daily)로 이동
+            navigate("/AI/daily", {
                 state: {
                     allClothes,
                     selectedItems,

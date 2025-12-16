@@ -220,3 +220,123 @@
     border-radius: 6px;
     cursor: pointer;
 }
+
+/* 캘린더 날짜 셀 내의 추천 표시 */
+.rec-indicator {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+}
+
+.rec-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #10b981; /* 초록색 점 */
+    border-radius: 50%;
+}
+
+.rec-text {
+    font-size: 11px;
+    color: #10b981;
+    font-weight: bold;
+}
+
+/* 추천 기록이 있는 셀 호버 효과 */
+.result-cell:hover {
+    background-color: #ecfdf5; /* 연한 초록색 배경 */
+}
+
+/* 모달 크기 확장 */
+.modal-content.large-modal {
+    width: 900px;
+    max-width: 95vw;
+    max-height: 85vh;
+    padding: 40px;
+    overflow-y: auto;
+    border-radius: 16px;
+}
+
+/* 모달 내부 리스트 컨테이너 */
+.rec-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* 개별 추천 카드 */
+.rec-card {
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 16px;
+    background: #fafafa;
+}
+
+.rec-card-header {
+    margin-bottom: 12px;
+}
+
+.rec-badge {
+    background-color: #7c3aed;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* 옷 4개 그리드 (아우터, 상의, 하의, 신발) */
+.outfit-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.outfit-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.outfit-item img {
+    width: 110px;
+    height: 110px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    margin: 8px 0;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.role-badge {
+    font-size: 10px;
+    color: #666;
+    margin-bottom: 2px;
+}
+
+.cloth-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+    margin-top: 4px;
+}
+
+.no-info {
+    font-size: 11px;
+    color: #999;
+    padding: 20px 0;
+}
+
+.rec-reason {
+    font-size: 13px;
+    color: #444;
+    background: #fff;
+    padding: 10px;
+    border-radius: 6px;
+    line-height: 1.5;
+    border: 1px dashed #ccc;
+}

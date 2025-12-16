@@ -102,25 +102,24 @@ app.post("/api/recommend", async (req, res) => {
   }
 });
 
-// 추천 결과 조회 (수정됨: 날짜 범위 지원)
+// [수정] 추천 결과 조회 (캘린더용 포맷 지원)
 app.get("/api/recommend/result", (req, res) => {
   try {
-    const { date, startDate, endDate } = req.query; 
-    
+    const { date, startDate, endDate, mode } = req.query; // mode 추가
+
     if (!fs.existsSync(REC_FILE_PATH)) {
-      return res.json([]); 
+      return res.json(mode === "map" ? {} : []);
     }
 
     const fileData = fs.readFileSync(REC_FILE_PATH, "utf8");
     const allData = JSON.parse(fileData);
-    let result = [];
 
-    // Case 1: 날짜 범위(startDate ~ endDate)가 주어진 경우
-    if (startDate && endDate) {
+    // Case 1: 캘린더 뷰를 위해 날짜를 Key로 하는 객체 반환 (mode=map)
+    if (mode === "map" && startDate && endDate) {
         const start = new Date(startDate);
         const end = new Date(endDate);
-        
-        // 반복문을 돌며 범위 내의 모든 데이터를 수집
+        const resultMap = {};
+
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
             const year = d.getFullYear();
             const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -128,13 +127,31 @@ app.get("/api/recommend/result", (req, res) => {
             const key = `${year}-${month}-${day}`;
             
             if (allData[key]) {
-                // allData[key]는 배열이므로 펼쳐서(result)에 추가
-                result.push(...allData[key]);
+                resultMap[key] = allData[key];
             }
         }
-    } 
-    // Case 2: 특정 날짜(date)만 주어진 경우 혹은 파라미터가 없는 경우(오늘 날짜)
-    else {
+        return res.json(resultMap);
+    }
+
+    // Case 2: 기존 로직 (배열 반환)
+    let result = [];
+    if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const key = `${year}-${month}-${day}`;
+            
+            if (allData[key]) {
+                // 프론트에서 날짜 구분을 위해 객체에 date 속성 주입하여 반환
+                const enrichedData = allData[key].map(item => ({...item, date: key}));
+                result.push(...enrichedData);
+            }
+        }
+    } else {
         const targetDate = date || new Date().toISOString().split('T')[0];
         result = allData[targetDate] || [];
     }

@@ -1,168 +1,123 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import "./AIResult.css";
+import "./AIResult.css"; // 기존 스타일 유지
 import { API_BASE_URL } from "./apiConfig";
 
 export default function AIResult() {
     const location = useLocation();
     const navigate = useNavigate();
     
-    // 이전 페이지(AIRecommend)에서 넘어온 정보들
-    // period: { start: "...", end: "..." } 형태
-    const { allClothes = [], targetDate, period } = location.state || {};
+    // AIRecommend에서 넘겨준 state 받기
+    const { allClothes = [], recommendations: initialRecs, period } = location.state || {};
     
-    // 서버에서 받아온 추천 데이터를 저장할 상태
-    const [recommendations, setRecommendations] = useState([]);
-    const [loading, setLoading] = useState(true);
-
+    // state로 받은 데이터가 있으면 그걸 쓰고, 없으면 빈 배열 (새로고침 시 사라질 수 있음)
+    const [recommendations, setRecommendations] = useState(initialRecs || []);
+    
+    // 옷 정보 찾기 헬퍼
     const findClothById = (id) => allClothes.find((c) => c.id === id);
 
-    // 컴포넌트 마운트 시 서버에 저장된 추천 결과 요청
+    // 만약 state 없이 직접 접근했다면 메인으로 돌려보내거나 알림
     useEffect(() => {
-        const fetchRecommendations = async () => {
-            try {
-                let query = "";
-
-                // 1. 기간(period)이 있는 경우 (범위 조회)
-                if (period && period.start && period.end) {
-                    const s = new Date(period.start).toISOString().split('T')[0];
-                    const e = new Date(period.end).toISOString().split('T')[0];
-                    query = `?startDate=${s}&endDate=${e}`;
-                } 
-                // 2. 특정 날짜(targetDate)만 있는 경우 (단일 조회)
-                else if (targetDate) {
-                    query = `?date=${targetDate}`;
-                }
-                // 3. 아무것도 없으면 기본적으로 오늘 날짜 기준 조회(백엔드 처리)
-                
-                const response = await fetch(`${API_BASE_URL}/api/recommend/result${query}`);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    // 데이터가 배열인지 확인 후 설정
-                    if (Array.isArray(data)) {
-                        setRecommendations(data);
-                    } else {
-                        // 만약 객체로 온다면 배열로 변환하거나 빈 배열 처리
-                        setRecommendations([]);
-                    }
-                } else {
-                    console.error("데이터 가져오기 실패 status:", response.status);
-                }
-            } catch (error) {
-                console.error("통신 에러:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchRecommendations();
-    }, [targetDate, period]); // period가 변경될 때도 재실행
-
-    if (loading) {
-        return <div className="ai-page"><h2>결과를 불러오는 중입니다...</h2></div>;
-    }
+        if (!initialRecs && !period) {
+            // 직접 URL 치고 들어온 경우 등
+            console.warn("전달된 추천 데이터가 없습니다.");
+        }
+    }, [initialRecs, period]);
 
     return (
         <>
-            {/* [수정] Navbar 5개 메뉴 적용 및 '추천 결과' 활성화 */}
             <nav id="nav3">
                 <Link to="/" className="logo">AI Closet</Link>
                 <ul>
                     <li><Link to="/">메인</Link></li>
                     <li><Link to="/closet">옷장</Link></li>
-                    <li><Link to="/AI">AI 추천</Link></li>
+                    <li><Link to="/AI" className="active">AI 추천</Link></li>
                     <li><Link to="/calendar">캘린더</Link></li>
-                    <li><Link to="/AI/result" className="active">추천 결과</Link></li>
+                    <li><Link to="/AI/result">추천 결과</Link></li>
                 </ul>
-                <button
-                    className="nav-upload-btn"
-                    onClick={() => navigate("/closet/upload")}
-                >
-                    옷 등록하기
-                </button>
             </nav>
 
             <div className="ai-page">
-                <h2>AI 추천 결과</h2>
-                <p>총 {recommendations.length}개의 코디를 추천했습니다.</p>
+                <div style={{textAlign: "center", marginTop: "30px"}}>
+                    <h2>✨ 추천 결과 도착!</h2>
+                    <p style={{color: "#666"}}>
+                        {period ? `${new Date(period.start).toLocaleDateString()} ~ ${new Date(period.end).toLocaleDateString()}` : ""} 
+                        기간의 코디입니다.
+                    </p>
+                </div>
 
                 <div className="result-container">
                     {recommendations.length > 0 ? (
                         recommendations.map((combo, idx) => (
                             <div key={idx} className="result-card">
-                                <h3>코디 #{idx + 1}</h3>
+                                <h3>Option {idx + 1}</h3>
 
                                 {combo.reason && (
                                     <div className="ai-comment-box">
-                                        <strong>AI 코멘트:</strong> {combo.reason}
+                                        <strong>💡 AI 코멘트:</strong> {combo.reason}
                                     </div>
                                 )}
 
                                 <div className="result-clothes">
-                                    {["outer", "top", "bottom", "shoes"].map(
-                                        (type) => {
-                                            const item = findClothById(combo[type]);
-                                            const imageUrl =
-                                                !item?.imageUrl ||
-                                                item.imageUrl.trim?.() === "" ||
-                                                item.imageUrl === "null"
-                                                    ? "/images/placeholder.png"
-                                                    : item.imageUrl;
-
-                                            return (
-                                                <div
-                                                    key={type}
-                                                    className="result-item"
-                                                >
-                                                    <p className="result-item-type">
-                                                        {type.toUpperCase()}
-                                                    </p>
-                                                    {item ? (
-                                                        <>
-                                                            <img
-                                                                src={imageUrl}
-                                                                alt={item.name}
-                                                                width="120"
-                                                                height="120"
-                                                                className="result-item-image"
-                                                                onError={(e) => {
-                                                                    e.target.src =
-                                                                        "/images/placeholder.png";
-                                                                }}
-                                                            />
-                                                            <p className="result-item-name">
-                                                                {item.name}
-                                                            </p>
-                                                            <p className="result-item-brand">
-                                                                {item.brand}
-                                                            </p>
-                                                        </>
-                                                    ) : (
-                                                        <div className="no-recommendation">
-                                                            추천 없음
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
+                                    {["outer", "top", "bottom", "shoes"].map((type) => {
+                                        const item = findClothById(combo[type]);
+                                        // 이미지 URL 처리
+                                        let imageUrl = "/images/placeholder.png";
+                                        if (item?.imageUrl && item.imageUrl !== "null") {
+                                            imageUrl = item.imageUrl;
                                         }
-                                    )}
+
+                                        return (
+                                            <div key={type} className="result-item">
+                                                <p className="result-item-type">{type.toUpperCase()}</p>
+                                                {item ? (
+                                                    <>
+                                                        <img
+                                                            src={`${API_BASE_URL}${imageUrl}`} // URL 경로 확인 필요 (보통 API_BASE_URL 필요할 수 있음)
+                                                            alt={item.name}
+                                                            className="result-item-image"
+                                                            onError={(e) => { e.target.src = "/images/placeholder.png"; }}
+                                                        />
+                                                        <p className="result-item-name">{item.name}</p>
+                                                    </>
+                                                ) : (
+                                                    <div className="no-recommendation">선택 안함</div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         ))
                     ) : (
                         <div style={{ textAlign: "center", padding: "40px", color: "#666" }}>
-                            해당 기간에 저장된 추천 결과가 없습니다.
+                            추천 결과를 불러올 수 없습니다. 다시 시도해주세요.
                         </div>
                     )}
                 </div>
 
-                <button
-                    className="recommend-btn"
-                    onClick={() => navigate("/AI")}
-                >
-                    다시 추천받기
-                </button>
+                <div style={{ 
+                    display: "flex", 
+                    justifyContent: "center", 
+                    gap: "20px", 
+                    margin: "40px 0 60px 0" 
+                }}>
+                    <button
+                        className="recommend-btn"
+                        style={{ backgroundColor: "#888" }}
+                        onClick={() => navigate("/AI")}
+                    >
+                        다시 추천받기
+                    </button>
+
+                    {/* [NEW] 캘린더 결과 페이지로 이동 버튼 */}
+                    <button
+                        className="recommend-btn"
+                        onClick={() => navigate("/AI/result")}
+                    >
+                        📅 캘린더에 저장된 기록 보기
+                    </button>
+                </div>
             </div>
         </>
     );
