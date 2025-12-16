@@ -278,9 +278,9 @@ export default function AIRecommend() {
                 /* 시작일과 종료일: 진한 파란색 배경 + 흰색 글씨 */
                 .calendar-grid .day-cell.range-start, 
                 .calendar-grid .day-cell.range-end {
-                    background-color: #3b82f6 !important;
+                    background-color: #3a82f5ff !important;
                     color: white !important;
-                    border-color: #2563eb;
+                    
                 }
                 
                 /* 시작일/종료일 내부의 텍스트 색상 강제 변경 */
@@ -292,7 +292,7 @@ export default function AIRecommend() {
                 
                 /* 기간 사이 구간: 연한 파란색 배경 */
                 .calendar-grid .day-cell.in-range {
-                    background-color: #eff6ff !important;
+                    background-color: #8eb9f0ff !important;
                 }
             `}</style>
 
@@ -320,7 +320,7 @@ export default function AIRecommend() {
                 </div>
 
                 <section className="calendar-section" style={{ marginBottom: "40px" }}>
-                    <h3>📅 일정 선택</h3>
+                    <h3>일정 선택</h3>
                     <div className="calendar-container">
                         <div className="calendar-header">
                             <button onClick={() => changeMonth(-1)}>◀</button>

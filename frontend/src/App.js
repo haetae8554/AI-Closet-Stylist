@@ -79,7 +79,7 @@ export default function App() {
     const days = [];
 
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="day-cell empty"></div>);
+      days.push(<div key={`empty-${i}`} className="day-cell1 empty"></div>);
     }
 
     for (let day = 1; day <= lastDate; day++) {
@@ -89,7 +89,7 @@ export default function App() {
       const dateKey = getDateKey(year, month, day);
       const dayEvents = events[dateKey] || [];
 
-      let className = "day-cell";
+      let className = "day-cell1";
       if (isSun) className += " sun";
       if (isSat) className += " sat";
 

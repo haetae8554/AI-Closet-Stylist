@@ -7,7 +7,7 @@ dotenv.config();
 
 // Gemini 모델 및 설정
 const GEMINI_MODEL = "gemma-3-12b-it"; 
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 3; // 키가 3개이므로 3회 시도와 매칭
 
 // API 데이터 부재 시 추정 날씨 반환
 function getSeasonalWeather(date) {
@@ -94,10 +94,14 @@ function getDayName(date) {
     return days[date.getDay()];
 }
 
-// 옷 추천 메인 함수
+// 옷 추천 메인 함수 (수정됨)
 export async function getRecommendations(req, selected, clothes, period) {
-    const API_KEY = process.env.GEMINI_API_KEY;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${API_KEY}`;
+    // API 키 배열 생성 (순서대로 1, 2, 3)
+    const apiKeys = [
+        process.env.GEMINI_API_KEY1,
+        process.env.GEMINI_API_KEY2,
+        process.env.GEMINI_API_KEY3
+    ];
 
     let weatherData = null;
     try {
@@ -164,7 +168,18 @@ ${JSON.stringify(selected, null, 2)}
     let attempt = 0;
     while (attempt < MAX_RETRIES) {
         try {
-            console.log(`[Gemini] 요청 시도 ${attempt + 1}`);
+            // 현재 시도 횟수에 맞춰 키 선택 (0->Key1, 1->Key2, 2->Key3)
+            const currentKey = apiKeys[attempt]; 
+            
+            // 키가 없는 경우 대비 (Optional)
+            if (!currentKey) {
+                throw new Error(`API Key not found for attempt ${attempt + 1}`);
+            }
+
+            // url 생성 로직을 루프 안으로 이동하여 동적 키 적용
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${currentKey}`;
+            
+            console.log(`[Gemini] 요청 시도 ${attempt + 1} (API Key ${attempt + 1} 사용)`);
             
             const res = await fetch(url, {
                 method: "POST",
@@ -173,9 +188,13 @@ ${JSON.stringify(selected, null, 2)}
             });
 
             if (!res.ok) {
-                if (res.status >= 500 || res.status === 429) {
-                    throw new Error(`Server Error ${res.status}`);
+                // 429(Too Many Requests) 또는 503(Service Unavailable) 등 서버 에러 시
+                // 에러를 throw하여 catch 블록으로 이동 -> 다음 키로 재시도 유도
+                if (res.status === 429 || res.status >= 500) {
+                    throw new Error(`Retryable Error: ${res.status}`);
                 }
+                // 그 외 클라이언트 에러(400 등)는 재시도 없이 종료
+                console.error(`[Gemini] 요청 실패: ${res.status}`);
                 return [];
             }
 
@@ -192,10 +211,16 @@ ${JSON.stringify(selected, null, 2)}
             return JSON.parse(jsonPart);
 
         } catch (error) {
-            attempt++;
-            console.error(`[Gemini] 오류:`, error.message);
+            console.error(`[Gemini] 오류 발생 (시도 ${attempt + 1}):`, error.message);
+            
+            attempt++; // 다음 시도(다음 키)로 이동
 
-            if (attempt >= MAX_RETRIES) return [];
+            if (attempt >= MAX_RETRIES) {
+                console.error("[Gemini] 모든 API 키 시도 실패");
+                return [];
+            }
+            
+            // 재시도 전 잠시 대기 (Rate Limit 보호)
             await new Promise(r => setTimeout(r, 1000 * attempt));
         }
     }
