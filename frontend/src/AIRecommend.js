@@ -7,24 +7,18 @@ import { API_BASE_URL } from "./apiConfig";
 export default function AIRecommend() {
     const navigate = useNavigate();
 
-    // ─────────────── [1. 캘린더 상태 및 로직] ───────────────
     const [viewDate, setViewDate] = useState(new Date());
     const [startDate, setStartDate] = useState(null);
     const [endDate, setEndDate] = useState(null);
-    
-    // 일정 데이터를 저장할 상태
     const [events, setEvents] = useState({});
-
   
     useEffect(() => {
-        // API_BASE_URL 사용
         fetch(`${API_BASE_URL}/api/calendar`)
             .then((res) => {
                 if (!res.ok) throw new Error("네트워크 응답 실패");
                 return res.json();
             })
             .then((data) => {
-                // 백엔드에서 받은 데이터로 상태 업데이트
                 setEvents(data);
             })
             .catch((err) => {
@@ -32,7 +26,6 @@ export default function AIRecommend() {
             });
     }, []);
 
-    // 날짜 키 생성 함수 (YYYY-MM-DD 형식)
     const getDateKey = (year, month, day) => {
         return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     };
@@ -58,7 +51,6 @@ export default function AIRecommend() {
         }
     };
 
-    // 문구 변경 로직
     const getPeriodText = () => {
         if (!startDate) return "AI 추천을 받을 기간의 시작일을 선택해주세요.";
         const startStr = `${startDate.getMonth() + 1}/${startDate.getDate()}`;
@@ -74,18 +66,15 @@ export default function AIRecommend() {
         const lastDate = new Date(year, month + 1, 0).getDate();
         const days = [];
 
-        // 빈 칸 채우기
         for (let i = 0; i < firstDay; i++) {
             days.push(<div key={`empty-${i}`} className="day-cell empty"></div>);
         }
 
-        // 날짜 채우기
         for (let day = 1; day <= lastDate; day++) {
             const currentDate = new Date(year, month, day);
             const isSun = currentDate.getDay() === 0;
             const isSat = currentDate.getDay() === 6;
 
-            // [핵심] API로 받아온 events 상태에서 해당 날짜의 일정 찾기
             const dateKey = getDateKey(year, month, day);
             const dayEvents = events[dateKey] || [];
 
@@ -93,7 +82,6 @@ export default function AIRecommend() {
             if (isSun) className += " sun";
             if (isSat) className += " sat";
 
-            // 기간 선택 하이라이팅 로직
             if (startDate && currentDate.getTime() === startDate.getTime()) {
                 className += " range-start";
             } else if (endDate && currentDate.getTime() === endDate.getTime()) {
@@ -108,9 +96,8 @@ export default function AIRecommend() {
                         <span className="day-number">{day}</span>
                     </div>
                     
-                    {/* 일정 텍스트 렌더링 (읽기 전용) */}
                     <div className="ai-cal-events">
-                        {dayEvents.map((evt) => (
+                        {dayEvents.slice(0, 3).map((evt) => (
                             <div key={evt.id} className="ai-event-text">
                                 {evt.title}
                             </div>
@@ -122,7 +109,6 @@ export default function AIRecommend() {
         return days;
     };
 
-    // ─────────────── [2. 옷 선택 상태 및 로직] ───────────────
     const [allClothes, setAllClothes] = useState([]);
     const [selectedItems, setSelectedItems] = useState({
         아우터: null,
@@ -134,9 +120,7 @@ export default function AIRecommend() {
     const [loading, setLoading] = useState(false);
     const [location, setLocation] = useState({ lat: null, lon: null });
 
-    // 옷 데이터 및 위치 정보 불러오기
     useEffect(() => {
-        // [수정됨] API_BASE_URL 사용
         fetch(`${API_BASE_URL}/api/clothes`, { cache: "no-store" })
             .then((res) => res.json())
             .then((data) => {
@@ -188,7 +172,6 @@ export default function AIRecommend() {
         try {
             setLoading(true);
 
-            // [수정됨] API_BASE_URL 사용
             let url = `${API_BASE_URL}/api/recommend`;
             if (location.lat && location.lon) {
                 url += `?lat=${location.lat}&lon=${location.lon}`;
@@ -230,34 +213,35 @@ export default function AIRecommend() {
 
     return (
         <>
-            {/* 인라인 스타일: 캘린더 내부 일정 텍스트용 */}
             <style>{`
                 .ai-cal-events {
                     display: flex;
                     flex-direction: column;
-                    gap: 2px;
-                    margin-top: 2px;
+                    gap: 3px;
+                    margin-top: 4px;
                     overflow: hidden;
-                    max-height: 45px; /* 너무 길어지면 자르기 */
+                    width: 100%;
                 }
                 .ai-event-text {
-                    font-size: 0.7rem;
+                    font-size: 0.75rem;
+                    line-height: 1.4;
                     background-color: #ebf5ff;
                     color: #1e40af;
-                    padding: 1px 4px;
-                    border-radius: 3px;
+                    padding: 3px 6px;
+                    border-radius: 4px;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
                     text-align: left;
+                    font-weight: 500;
                 }
                 .calendar-grid .day-cell {
-                    min-height: 80px; 
+                    min-height: 100px;
                     display: flex;
                     flex-direction: column;
                     justify-content: flex-start;
                     align-items: stretch;
-                    padding: 4px;
+                    padding: 6px;
                     cursor: pointer;
                 }
                 .calendar-grid .day-cell:hover {
@@ -270,12 +254,15 @@ export default function AIRecommend() {
                 }
             `}</style>
 
+            {/* [수정] 5개 메뉴 Navbar */}
             <nav id="nav3">
                 <Link to="/" className="logo">AI Closet</Link>
                 <ul>
+                    <li><Link to="/">메인</Link></li>
                     <li><Link to="/closet">옷장</Link></li>
                     <li><Link to="/AI" className="active">AI 추천</Link></li>
                     <li><Link to="/calendar">캘린더</Link></li>
+                    <li><Link to="/AI/result">추천 결과</Link></li>
                 </ul>
                 <button 
                     className="nav-upload-btn" 
@@ -294,7 +281,6 @@ export default function AIRecommend() {
                     </p>
                 </div>
 
-                {/* 1. 캘린더 섹션 */}
                 <section className="calendar-section" style={{ marginBottom: "40px" }}>
                     <h3>📅 일정 선택</h3>
                     <div className="calendar-container">
@@ -316,13 +302,11 @@ export default function AIRecommend() {
                             {renderCalendarGrid()}
                         </div>
                     </div>
-                    {/* 기간 선택 안내 문구가 표시되는 곳 */}
                     <div className="selected-range-info">
                         {getPeriodText()}
                     </div>
                 </section>
 
-                {/* 2. 옷 선택 섹션 */}
                 <section className="clothes-selection-area">
                     <h3>👕 옷 선택 (옵션)</h3>
                     {location.lat && (
@@ -344,7 +328,6 @@ export default function AIRecommend() {
                     </div>
 
                     <div className="ai-layout">
-                        {/* 왼쪽: 옷 목록 리스트 */}
                         <div className="clothes-list">
                             {filteredClothes.length > 0 ? (
                                 filteredClothes.map((cloth) => (
@@ -373,7 +356,6 @@ export default function AIRecommend() {
                             )}
                         </div>
 
-                        {/* 오른쪽: 선택 패널 */}
                         <div className="selected-panel">
                             <h3>선택된 옷</h3>
                             <div style={{display:"flex", flexDirection:"column", gap:"10px"}}>

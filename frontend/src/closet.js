@@ -1,14 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom"; // Link 추가
+import { Link, useNavigate } from "react-router-dom"; 
 import "./closet.css";
-
-// [수정] 설정 파일에서 API 주소 가져오기
 import { API_BASE_URL } from "./apiConfig";
 
 const FILTERS = ["전체", "상의", "아우터", "하의", "신발"];
 const SORT_KEYS = ["정렬: 최신순", "정렬: 이름"];
 
-// API 데이터 정규화 함수
 function normalizeItem(raw, idx = 0) {
     const id = String(raw?.id ?? Date.now() + "-" + idx);
     const type = String(raw?.type ?? "").trim();
@@ -34,7 +31,6 @@ function normalizeItem(raw, idx = 0) {
     };
 }
 
-// URL 쿼리스트링 파싱
 function restoreFromURL(search, setters) {
     const params = new URLSearchParams(search);
     const type = params.get("type");
@@ -55,12 +51,10 @@ export default function Closet() {
     const navigate = useNavigate();
     const [sourceItems, setSourceItems] = useState([]);
     
-    // 필터 및 정렬 상태들
     const [filter, setFilter] = useState("전체");
     const [sortKey, setSortKey] = useState("정렬: 최신순");
     const [page, setPage] = useState(1);
     
-    // 상세 필터
     const [featureFilter, setFeatureFilter] = useState(null);
     const [subTypeFilter, setSubTypeFilter] = useState(null);
     const [brandFilter, setBrandFilter] = useState(null);
@@ -70,7 +64,6 @@ export default function Closet() {
     const [loadErr, setLoadErr] = useState("");
     const pageSize = 8;
 
-    // 1. 초기 데이터 로드
     useEffect(() => {
         (async () => {
             try {
@@ -93,7 +86,6 @@ export default function Closet() {
         })();
     }, []);
 
-    // 2. 뒤로가기 및 URL 복구
     useEffect(() => {
         const onPop = () => {
             setFeatureFilter(null); setSubTypeFilter(null); setBrandFilter(null); setThicknessFilter(null); setFilter("전체");
@@ -112,7 +104,6 @@ export default function Closet() {
         return () => window.removeEventListener("popstate", onPop);
     }, []);
 
-    // 카테고리별 개수 계산
     const counts = useMemo(() => {
         const map = { 전체: sourceItems.length };
         for (const t of FILTERS.slice(1))
@@ -120,7 +111,6 @@ export default function Closet() {
         return map;
     }, [sourceItems]);
 
-    // 필터링 로직
     const filtered = useMemo(() => {
         let base = sourceItems;
         if (filter !== "전체") base = base.filter((i) => i.type === filter);
@@ -131,7 +121,6 @@ export default function Closet() {
         return base;
     }, [sourceItems, filter, featureFilter, subTypeFilter, brandFilter, thicknessFilter]);
 
-    // 정렬 로직
     const sorted = useMemo(() => {
         const arr = [...filtered];
         const map = {
@@ -142,7 +131,6 @@ export default function Closet() {
         return arr;
     }, [filtered, sortKey]);
 
-    // 페이지네이션
     const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
     const pageSafe = Math.min(Math.max(1, page), totalPages);
     const paged = useMemo(() => {
@@ -156,7 +144,6 @@ export default function Closet() {
         navigate(`/closet/detail?id=${item.id}`, { state: { item } });
     };
 
-    // 카테고리 클릭 핸들러
     const handleCategoryClick = (f) => {
         setFilter(f);
         setFeatureFilter(null); setSubTypeFilter(null); setBrandFilter(null); setThicknessFilter(null);
@@ -165,14 +152,15 @@ export default function Closet() {
 
     return (
         <div className="closet-page">
-            {/* 1. Global Navigation (공통) */}
+            {/* [수정] 5개 메뉴 Navbar */}
             <nav id="nav3">
                 <Link to="/" className="logo">AI Closet</Link>
                 <ul>
-                    {/* 옷장 페이지이므로 '옷장'에 active 클래스 부여 */}
+                    <li><Link to="/">메인</Link></li>
                     <li><Link to="/closet" className="active">옷장</Link></li>
                     <li><Link to="/AI">AI 추천</Link></li>
                     <li><Link to="/calendar">캘린더</Link></li>
+                    <li><Link to="/AI/result">추천 결과</Link></li>
                 </ul>
                 <button 
                     className="nav-upload-btn" 
@@ -183,7 +171,6 @@ export default function Closet() {
             </nav>
 
             <main className="closet-container">
-                {/* 2. Sub Navigation (옷장 필터) - 아래로 이동 */}
                 <section className="category-tabs">
                     <ul>
                         {FILTERS.map((f) => {
@@ -202,7 +189,6 @@ export default function Closet() {
                     </ul>
                 </section>
 
-                {/* Toolbar */}
                 <section className="toolbar">
                     <div className="left">
                         {brandFilter ? `홈 / 옷장 / ${brandFilter}`
@@ -222,7 +208,6 @@ export default function Closet() {
                     </div>
                 </section>
 
-                {/* Product Grid */}
                 {sorted.length > 0 ? (
                     <section id="productGrid" className="product-grid">
                         {paged.map((item) => (
@@ -306,7 +291,6 @@ export default function Closet() {
                     <p className="empty-hint">{loading ? "불러오는 중…" : loadErr || "불러온 옷이 없습니다."}</p>
                 )}
 
-                {/* Pager */}
                 {sorted.length > 0 && (
                     <footer className="pager">
                         <button disabled={pageSafe <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>이전</button>
