@@ -42,8 +42,8 @@ const BASE_HOURS = [2, 5, 8, 11, 14, 17, 20, 23];
 // [변경] 파일 대신 메모리(변수)에 캐시 저장
 // 서버가 꺼지면 사라지지만, 어차피 무료 서버 파일도 사라지므로 성능상 이득입니다.
 let landCache = {
-    lastUpdated: null,
-    regions: {}
+  lastUpdated: null,
+  regions: {}
 };
 
 let regionMeta = null;
@@ -54,14 +54,24 @@ function pad2(n) {
   return n < 10 ? "0" + n : String(n);
 }
 
-// 최신 단기예보 기준시각 계산
+// [수정됨] 최신 단기예보 기준시각 계산 (서버 UTC -> KST 변환 적용)
 function getLatestLandFcstTime() {
-  const d = new Date();
-  const h = d.getHours();
+  const curr = new Date();
 
+  // 1. 현재 서버 시간(UTC 포함)을 밀리초로 변환 후 UTC+9(KST) 시간값 계산
+  // getTimezoneOffset()은 분 단위, 한국은 -540(분)이므로 UTC로 맞추기 위해 더해줌
+  // 그 후 한국 시간 9시간(9 * 60 * 60 * 1000ms)을 더함
+  const utc = curr.getTime() + (curr.getTimezoneOffset() * 60 * 1000);
+  const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
+  
+  // d는 이제 한국 시간을 가리키는 Date 객체처럼 동작함
+  const d = new Date(utc + KR_TIME_DIFF);
+  
+  const h = d.getHours();
   let hour = 0;
 
   if (h < BASE_HOURS[0]) {
+    // 한국 시간 기준 자정~02시 사이라면 전날 23시 기준 예보를 가져와야 함
     d.setDate(d.getDate() - 1);
     hour = 23;
   } else {
@@ -71,6 +81,7 @@ function getLatestLandFcstTime() {
   const y = d.getFullYear();
   const m = pad2(d.getMonth() + 1);
   const day = pad2(d.getDate());
+  
   return `${y}${m}${day}${pad2(hour)}`;
 }
 

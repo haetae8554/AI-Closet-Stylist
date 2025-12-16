@@ -1,24 +1,32 @@
 import fetch from "node-fetch"; 
 import dotenv from "dotenv";
-import pg from "pg"; // 1. DB 연결을 위해 추가
+import pg from "pg"; 
 import { getWeatherByRequest } from "./WeatherService.js";
 
 dotenv.config();
 const { Pool } = pg;
 
-// 2. DB 연결 설정 (server.js와 동일한 환경변수 사용)
+// 2. DB 연결 설정
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
 // Gemini 모델 및 설정
-const GEMINI_MODEL = "gemma-3-12b-it"; // 또는 "gemini-1.5-flash" 등 사용 가능한 모델
+const GEMINI_MODEL = "gemma-3-12b-it"; 
 const MAX_RETRIES = 3; 
 
-// API 데이터 부재 시 추정 날씨 반환
-function getSeasonalWeather(date) {
-    const month = date.getMonth() + 1;
+// [추가] Date 객체를 한국 시간(KST) 기준의 Date 객체로 변환하는 헬퍼
+function toKST(date) {
+  // 현재 Date 객체의 타임스탬프(ms)
+  const utc = date.getTime() + (date.getTimezoneOffset() * 60 * 1000);
+  const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
+  return new Date(utc + KR_TIME_DIFF);
+}
+
+// API 데이터 부재 시 추정 날씨 반환 (KST 기준 월 사용)
+function getSeasonalWeather(kstDate) {
+    const month = kstDate.getMonth() + 1;
     
     if (month >= 3 && month <= 5) {
         return "평균 기온 10~20도, 일교차가 큰 봄 날씨 예상";
@@ -35,28 +43,37 @@ function getSeasonalWeather(date) {
 async function formatContextForPrompt(weatherData, period) {
     let resultString = "";
     
+    // 기간 설정 (입력이 없으면 현재 시간 사용)
+    // start/end가 문자열로 들어오더라도 new Date()로 처리하되, 
+    // 반복문 내부에서 KST 변환을 수행하여 날짜 키를 맞춥니다.
     const start = period?.start ? new Date(period.start) : new Date();
     const end = period?.end ? new Date(period.end) : new Date();
     
-    // 3. DB에서 캘린더 일정 가져오기 (기존 CalendarService 대체)
+    // 3. DB에서 캘린더 일정 가져오기
     let allEvents = {};
     try {
-        // server.js에서 저장한 방식(단일 row JSON)에 맞춰 조회
         const res = await pool.query("SELECT data FROM calendar ORDER BY id DESC LIMIT 1");
         if (res.rows.length > 0) {
             allEvents = res.rows[0].data || {};
         }
     } catch (e) {
         console.error("DB 일정 로드 실패:", e);
-        // DB 에러가 나도 날씨 기반 추천은 작동하도록 빈 객체 유지
     }
 
     const weatherItems = weatherData?.landFcst?.items || [];
 
+    // 날짜 반복
+    // 주의: d는 루프 제어용 변수이고, 실제 날짜 문자열(YYYY-MM-DD) 생성은 kstDate를 사용
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
+        
+        // [수정] 서버 시간이 아닌 KST 기준으로 연/월/일 추출
+        const kstDate = toKST(d);
+        
+        const year = kstDate.getFullYear();
+        const month = String(kstDate.getMonth() + 1).padStart(2, '0');
+        const day = String(kstDate.getDate()).padStart(2, '0');
+        
+        // DB나 API 매칭을 위한 Key 생성 (한국 시간 기준)
         const dateKey = `${year}-${month}-${day}`; 
         const dateKeyNoHyphen = `${year}${month}${day}`;
 
@@ -69,6 +86,7 @@ async function formatContextForPrompt(weatherData, period) {
         // 날씨 처리
         let weatherDesc = "";
         const matchedWeathers = weatherItems.filter(item => {
+            // 기상청 데이터(TM_EF) 형식: YYYYMMDDHHmm
             const fcstDateRaw = item.tmEf || item.TM_EF || ""; 
             return fcstDateRaw.startsWith(dateKeyNoHyphen);
         });
@@ -88,11 +106,13 @@ async function formatContextForPrompt(weatherData, period) {
                 weatherDesc = `날씨(예보): ${skyStatus}`;
             }
         } else {
-            const seasonal = getSeasonalWeather(d);
+            // 추정 날씨도 KST 기준 날짜 객체 전달
+            const seasonal = getSeasonalWeather(kstDate);
             weatherDesc = `날씨(추정): 예보 데이터 없음. ${month}월 통계 기반 - ${seasonal}`;
         }
 
-        resultString += `[${month}/${day} (${getDayName(d)})]\n  - ${weatherDesc}\n  - ${eventText}\n\n`;
+        // 요일도 KST 기준으로 구함
+        resultString += `[${month}/${day} (${getDayName(kstDate)})]\n  - ${weatherDesc}\n  - ${eventText}\n\n`;
     }
 
     const locationStr = weatherData?.location 
@@ -125,6 +145,9 @@ export async function getRecommendations(req, selected, clothes, period) {
 
     const contextString = await formatContextForPrompt(weatherData, period);
 
+    // 시작/종료일 비교 시에도 KST 기준을 고려하거나, 
+    // 단순 문자열 비교를 위해 입력받은 원본 period 객체 활용이 안전할 수 있음.
+    // 여기서는 간단히 toDateString 비교 유지 (큰 차이 없음)
     const startDate = period?.start ? new Date(period.start) : new Date();
     const endDate = period?.end ? new Date(period.end) : new Date();
     const isSingleDay = startDate.toDateString() === endDate.toDateString();
@@ -184,7 +207,6 @@ ${JSON.stringify(selected, null, 2)}
             const currentKey = apiKeys[attempt]; 
             
             if (!currentKey) {
-                // 키가 없으면 에러 발생 -> catch로 이동 -> 다음 키 시도
                 throw new Error(`API Key not found for attempt ${attempt + 1}`);
             }
 
@@ -203,7 +225,7 @@ ${JSON.stringify(selected, null, 2)}
                     throw new Error(`Retryable Error: ${res.status}`);
                 }
                 console.error(`[Gemini] 요청 실패: ${res.status}`);
-                return []; // 재시도 불가능한 에러(400 등)는 종료
+                return []; 
             }
 
             const data = await res.json();
