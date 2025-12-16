@@ -1,13 +1,47 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import "./AIResult.css";
 
 export default function AIResult() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { allClothes = [], recommendations = [] } = location.state || {};
+    
+    // 이전 페이지에서 넘어온 전체 옷 정보와 타겟 날짜 정보
+    const { allClothes = [], targetDate } = location.state || {};
+    
+    // 서버에서 받아온 추천 데이터를 저장할 상태
+    const [recommendations, setRecommendations] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     const findClothById = (id) => allClothes.find((c) => c.id === id);
+
+    // 컴포넌트 마운트 시 서버에 저장된 추천 결과 요청
+    useEffect(() => {
+        const fetchRecommendations = async () => {
+            try {
+                // targetDate가 있으면 쿼리 스트링으로 전달, 없으면 오늘 날짜 기준
+                const dateQuery = targetDate ? `?date=${targetDate}` : "";
+                const response = await fetch(`http://localhost:3001/api/recommend/result${dateQuery}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    setRecommendations(data);
+                } else {
+                    console.error("데이터 가져오기 실패");
+                }
+            } catch (error) {
+                console.error("통신 에러:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchRecommendations();
+    }, [targetDate]);
+
+    if (loading) {
+        return <div className="ai-page"><h2>결과를 불러오는 중입니다...</h2></div>;
+    }
 
     return (
         <>
