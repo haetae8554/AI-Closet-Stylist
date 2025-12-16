@@ -5,7 +5,8 @@ import "./App.css";
 import { API_BASE_URL } from "./apiConfig";
 
 // ────────────────────────────────────────────────────────────────
-// 좌표 변환 함수 (기존 유지)
+// 좌표 변환 함수
+// (참고: 백엔드가 위도/경도를 직접 처리하게 변경되었으므로, 현재 로직에서는 사용되지 않으나 코드는 유지합니다)
 function dfs_xy_conv(code, v1, v2) {
   const RE = 6371.00877; // 지구 반경(km)
   const GRID = 5.0; // 격자 간격(km)
@@ -122,7 +123,7 @@ export default function App() {
   const [viewDate, setViewDate] = useState(new Date()); 
   const [events, setEvents] = useState({});
 
-  // [수정됨] 캘린더 데이터: localStorage 대신 API 호출
+  // 캘린더 데이터 조회
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/calendar`)
       .then(res => {
@@ -164,7 +165,6 @@ export default function App() {
       const isSat = currentDate.getDay() === 6;
       
       const dateKey = getDateKey(year, month, day);
-      // events 객체에서 해당 날짜 키가 있고, 배열 길이가 0보다 크면 점 표시
       const hasEvent = events[dateKey] && events[dateKey].length > 0;
 
       let className = "day-cell";
@@ -184,18 +184,25 @@ export default function App() {
   };
 
   // ────────────────────────────────────────────────────────────────
-  // [수정] 날씨 조회: API_BASE_URL 적용
+  // [수정됨] 날씨 조회 로직
+  // 1. 먼저 기본값(서울)을 호출하여 화면에 즉시 표시
+  // 2. 위치 권한 허용 시 해당 좌표(lat, lon)로 다시 호출하여 갱신
   // ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const fetchWeather = async (nx, ny) => {
+    const fetchWeather = async (lat, lon) => {
       try {
-        setWeatherLoading(true);
+        // 이미 날씨 데이터가 있으면(기본값 로딩 후 갱신 시) 로딩 스피너 생략
+        if (!weather) setWeatherLoading(true);
         setWeatherError("");
         
-        // [변경] API_BASE_URL 사용
+        // [중요] 백엔드 WeatherService는 'lat', 'lon' 파라미터를 받습니다. (nx, ny 아님)
         let url = `${API_BASE_URL}/api/weather/current`;
-        if (nx && ny) url += `?nx=${nx}&ny=${ny}`;
+        if (lat && lon) {
+           url += `?lat=${lat}&lon=${lon}`;
+        }
         
+        console.log("📡 날씨 요청 URL:", url);
+
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
@@ -208,29 +215,33 @@ export default function App() {
       }
     };
 
+    // 1. [즉시 실행] 좌표 없이 호출 -> 백엔드가 설정한 기본값(서울) 가져옴
+    fetchWeather(null, null);
+
+    // 2. [비동기 실행] 브라우저 위치 정보 확인
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          // 성공 시: 위도/경도를 그대로 백엔드에 전송
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
-          const { x, y } = dfs_xy_conv("toXY", lat, lon);
-          fetchWeather(x, y);
+          
+          console.log(`📍 사용자 위치 확보: ${lat}, ${lon} -> 날씨 업데이트 시도`);
+          fetchWeather(lat, lon);
         },
         (error) => {
-          console.warn("⚠️ 위치 정보 에러, 기본값 조회", error);
-          fetchWeather(null, null);
+          console.warn("⚠️ 위치 정보 권한 거부 또는 에러 (기본 서울 날씨 유지)", error);
         }
       );
     } else {
-      fetchWeather(null, null);
+       console.log("🚫 Geolocation 미지원 브라우저");
     }
   }, []);
 
-  // [수정] 옷 목록 조회: API_BASE_URL 적용
+  // 옷 목록 조회 (기존 유지)
   useEffect(() => {
     async function fetchClothes() {
       try {
-        // [변경] API_BASE_URL 사용
         const res = await fetch(`${API_BASE_URL}/api/clothes`);
         if (!res.ok) return;
         const data = await res.json();
