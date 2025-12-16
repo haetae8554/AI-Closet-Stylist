@@ -190,7 +190,7 @@ export default function CalendarPage() {
 
             <main className="calendar-main-container">
                 <div className="cal-header">
-                    <h2>📅 나의 일정 관리</h2>
+                    <h2>나의 일정 관리</h2>
                     <p>날짜를 클릭하여 일정을 추가하거나 삭제하세요.</p>
                 </div>
 
