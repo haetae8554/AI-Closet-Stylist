@@ -25,8 +25,7 @@ const DEFAULT_LOCATION = {
 // 예보 구역 기본값
 const DEFAULT_REG_ID = "11B10101";
 
-// 파일 경로 (읽기 전용인 regions.json만 유지)
-// 주의: 배포 시 data/regions.json 파일이 깃허브에 올라가 있어야 합니다!
+// 파일 경로
 const REGION_JSON_PATH = path.resolve(__dirname, "../../data/regions.json");
 
 // 캐시 설정
@@ -39,8 +38,7 @@ const LAND_COLS = [
 ];
 const BASE_HOURS = [2, 5, 8, 11, 14, 17, 20, 23];
 
-// [변경] 파일 대신 메모리(변수)에 캐시 저장
-// 서버가 꺼지면 사라지지만, 어차피 무료 서버 파일도 사라지므로 성능상 이득입니다.
+// 메모리 캐시
 let landCache = {
   lastUpdated: null,
   regions: {}
@@ -54,35 +52,39 @@ function pad2(n) {
   return n < 10 ? "0" + n : String(n);
 }
 
-// [수정됨] 최신 단기예보 기준시각 계산 (서버 UTC -> KST 변환 적용)
+// [수정됨] KST(서울) 기준 단기예보 기준시각 계산 (서버 시간대 무관)
 function getLatestLandFcstTime() {
   const curr = new Date();
 
-  // 1. 현재 서버 시간(UTC 포함)을 밀리초로 변환 후 UTC+9(KST) 시간값 계산
-  // getTimezoneOffset()은 분 단위, 한국은 -540(분)이므로 UTC로 맞추기 위해 더해줌
-  // 그 후 한국 시간 9시간(9 * 60 * 60 * 1000ms)을 더함
-  const utc = curr.getTime() + (curr.getTimezoneOffset() * 60 * 1000);
-  const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
-  
-  // d는 이제 한국 시간을 가리키는 Date 객체처럼 동작함
-  const d = new Date(utc + KR_TIME_DIFF);
-  
-  const h = d.getHours();
+  // 1. 현재 서버 시간을 'Asia/Seoul' 시간대의 문자열로 변환하여 Date 객체 생성
+  // 이렇게 하면 서버가 UTC여도 kstDate는 한국 시간을 기준으로 시간을 뱉습니다.
+  const kstString = curr.toLocaleString("en-US", { timeZone: "Asia/Seoul" });
+  const kstDate = new Date(kstString);
+
+  const h = kstDate.getHours();
   let hour = 0;
+  
+  // 날짜 계산을 위해 복사본 사용
+  let targetDate = new Date(kstDate);
 
   if (h < BASE_HOURS[0]) {
     // 한국 시간 기준 자정~02시 사이라면 전날 23시 기준 예보를 가져와야 함
-    d.setDate(d.getDate() - 1);
+    targetDate.setDate(targetDate.getDate() - 1);
     hour = 23;
   } else {
     hour = BASE_HOURS.filter((bh) => bh <= h).pop();
   }
 
-  const y = d.getFullYear();
-  const m = pad2(d.getMonth() + 1);
-  const day = pad2(d.getDate());
+  const y = targetDate.getFullYear();
+  const m = pad2(targetDate.getMonth() + 1);
+  const day = pad2(targetDate.getDate());
   
-  return `${y}${m}${day}${pad2(hour)}`;
+  const result = `${y}${m}${day}${pad2(hour)}`;
+  
+  // [디버깅용 로그] 서버에서 계산된 한국 시간이 맞는지 확인
+  // console.log(`[TimeCheck] ServerRaw: ${curr.toISOString()} -> KST Calc: ${result}`);
+  
+  return result;
 }
 
 // 응답 파싱
@@ -169,7 +171,6 @@ export async function getLocationFromRequest(req) {
     };
   }
 
-  // 무료 플랜 사용 시 http 요청 제한이 있을 수 있으니 예외처리 필요
   try {
       const url = `${GEO_API_BASE}${ip}?fields=status,country,regionName,city,lat,lon,query`;
       const res = await fetch(url);
@@ -196,11 +197,10 @@ export async function getLocationFromRequest(req) {
   }
 }
 
-// regions.json 로드 (파일 읽기)
+// regions.json 로드
 function loadRegionMeta() {
   if (regionMeta) return;
 
-  // 배포 환경에서 파일이 없는 경우를 대비
   if (!fs.existsSync(REGION_JSON_PATH)) {
     console.error("regions.json 파일 없음 - GitHub에 data 폴더가 올라갔는지 확인하세요.");
     regionMeta = {
@@ -267,19 +267,21 @@ function resolveRegIdFromLocation(loc) {
   return regId;
 }
 
-// 단기예보 API 호출
+// [수정됨] 단기예보 API 호출 (tmfc 적용)
 async function fetchLandFcst(regId) {
-  getLatestLandFcstTime();
+  // 1. 계산된 시간을 변수에 저장
+  const tmfc = getLatestLandFcstTime();
 
   const params = new URLSearchParams({
     reg: regId,
     disp: "0",
     help: "0",
     authKey: KMA_KEY,
+    tmfc: tmfc, // 2. 여기에 반드시 포함시켜야 함
   });
 
   const url = `${LAND_FCST_BASE}?${params.toString()}`;
-  console.log("[KMA] land 요청", url);
+  console.log(`[KMA] land 요청 (tmfc=${tmfc}) url: ${url}`);
 
   const res = await fetch(url);
   if (!res.ok) {
@@ -309,9 +311,6 @@ async function fetchLandFcst(regId) {
 
   return { regId, items, raw: parsed.raw };
 }
-
-// [변경] 파일 캐시 함수 삭제 (loadLandCacheFromFile, saveLandCacheToFile)
-// 대신 메모리 변수 landCache를 직접 사용
 
 // regId 기준 단기예보 조회 (메모리 캐시 사용)
 async function getLandFcstByRegId(regId) {
@@ -351,8 +350,6 @@ async function getLandFcstByRegId(regId) {
 
 // 특보 조회
 export async function getWarn() {
-  // 특보는 실시간성이 중요하므로 캐시 없이 호출하거나 짧은 캐시 적용
-  // 여기서는 기존 로직대로 매번 호출
   const url = `${WARN_BASE}?tmfc=0&authKey=${KMA_KEY}`;
   const parsed = await fetchKma("warn", url);
   return { data: parsed };
