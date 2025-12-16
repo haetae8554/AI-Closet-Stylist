@@ -16,6 +16,17 @@ export default function AIResult() {
     // 옷 정보 찾기 헬퍼
     const findClothById = (id) => allClothes.find((c) => c.id === id);
 
+    // [NEW] 이미지 URL 처리 함수 (RecommendationResultPage와 동일 로직 적용)
+    const getImageUrl = (url) => {
+        if (!url || url === "null") return "https://via.placeholder.com/150?text=No+Image";
+        // 외부 링크(http, https)인 경우 그대로 반환
+        if (url.startsWith("http") || url.startsWith("https")) {
+            return url; 
+        }
+        // 내부 파일인 경우 API 주소 결합
+        return `${API_BASE_URL}${url}`;
+    };
+
     // 만약 state 없이 직접 접근했다면 메인으로 돌려보내거나 알림
     useEffect(() => {
         if (!initialRecs && !period) {
@@ -61,22 +72,21 @@ export default function AIResult() {
                                 <div className="result-clothes">
                                     {["outer", "top", "bottom", "shoes"].map((type) => {
                                         const item = findClothById(combo[type]);
-                                        // 이미지 URL 처리
-                                        let imageUrl = "/images/placeholder.png";
-                                        if (item?.imageUrl && item.imageUrl !== "null") {
-                                            imageUrl = item.imageUrl;
-                                        }
 
                                         return (
                                             <div key={type} className="result-item">
                                                 <p className="result-item-type">{type.toUpperCase()}</p>
                                                 {item ? (
                                                     <>
+                                                        {/* [NEW] 수정된 이미지 렌더링 부분 */}
                                                         <img
-                                                            src={`${API_BASE_URL}${imageUrl}`} // URL 경로 확인 필요 (보통 API_BASE_URL 필요할 수 있음)
+                                                            src={getImageUrl(item.imageUrl)}
                                                             alt={item.name}
                                                             className="result-item-image"
-                                                            onError={(e) => { e.target.src = "/images/placeholder.png"; }}
+                                                            onError={(e) => {
+                                                                e.target.onerror = null;
+                                                                e.target.src = "https://via.placeholder.com/150?text=Error";
+                                                            }}
                                                         />
                                                         <p className="result-item-name">{item.name}</p>
                                                     </>
@@ -110,7 +120,6 @@ export default function AIResult() {
                         다시 추천받기
                     </button>
 
-                    {/* [NEW] 캘린더 결과 페이지로 이동 버튼 */}
                     <button
                         className="recommend-btn"
                         onClick={() => navigate("/AI/result")}

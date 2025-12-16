@@ -1,25 +1,24 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./App.css";
-import "./CalendarPage.css"; // 기존 스타일 재사용
+import "./CalendarPage.css"; 
 import { API_BASE_URL } from "./apiConfig";
 
 export default function RecommendationResultPage() {
     const navigate = useNavigate();
 
     const [viewDate, setViewDate] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState(null); // 클릭한 날짜 정보
+    const [selectedDate, setSelectedDate] = useState(null); 
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const [recMap, setRecMap] = useState({}); // { "2025-12-01": [코디1, 코디2] }
-    const [clothesMap, setClothesMap] = useState({}); // { "top-001": {이미지, 이름...} }
+    const [recMap, setRecMap] = useState({}); 
+    const [clothesMap, setClothesMap] = useState({}); 
 
-    // 1. 옷 목록 불러오기 (ID로 이미지 매칭하기 위함)
+    // 1. 옷 목록 불러오기
     useEffect(() => {
         fetch(`${API_BASE_URL}/api/clothes`)
             .then((res) => res.json())
             .then((data) => {
-                // 검색 속도를 위해 ID를 Key로 하는 객체로 변환
                 const map = {};
                 data.forEach((cloth) => {
                     map[cloth.id] = cloth;
@@ -29,12 +28,11 @@ export default function RecommendationResultPage() {
             .catch((err) => console.error("옷 목록 로드 실패:", err));
     }, []);
 
-    // 2. 월이 바뀔 때마다 해당 월의 추천 데이터 불러오기
+    // 2. 월별 추천 데이터 불러오기
     useEffect(() => {
         const year = viewDate.getFullYear();
         const month = viewDate.getMonth();
         
-        // 해당 월의 1일 ~ 말일 구하기
         const startDate = new Date(year, month, 1);
         const endDate = new Date(year, month + 1, 0);
 
@@ -43,7 +41,6 @@ export default function RecommendationResultPage() {
 
         console.log(`📡 [GET] 추천 기록 조회: ${startStr} ~ ${endStr}`);
 
-        // server.js에서 수정한 mode=map 파라미터 사용
         fetch(`${API_BASE_URL}/api/recommend/result?startDate=${startStr}&endDate=${endStr}&mode=map`)
             .then((res) => res.json())
             .then((data) => {
@@ -53,7 +50,6 @@ export default function RecommendationResultPage() {
             .catch((err) => console.error("추천 기록 로드 실패:", err));
     }, [viewDate]);
 
-    // 날짜 포맷 (YYYY-MM-DD)
     const getDateKey = (d) => {
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -77,13 +73,9 @@ export default function RecommendationResultPage() {
         if (dataForDay && dataForDay.length > 0) {
             setSelectedDate({ dateKey, displayDate: `${month + 1}월 ${day}일`, data: dataForDay });
             setIsModalOpen(true);
-        } else {
-            // 데이터가 없으면 아무 동작 안 함 (혹은 알림)
-            // alert("해당 날짜에는 추천 받은 기록이 없습니다.");
         }
     };
 
-    // 캘린더 그리기
     const renderCalendarGrid = () => {
         const year = viewDate.getFullYear();
         const month = viewDate.getMonth();
@@ -91,25 +83,21 @@ export default function RecommendationResultPage() {
         const lastDate = new Date(year, month + 1, 0).getDate();
         const days = [];
 
-        // 빈 칸 채우기
         for (let i = 0; i < firstDay; i++) {
             days.push(<div key={`empty-${i}`} className="cal-cell empty"></div>);
         }
 
-        // 날짜 채우기
         for (let day = 1; day <= lastDate; day++) {
             const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             const hasRec = recMap[dateKey] && recMap[dateKey].length > 0;
-
             const currentDate = new Date(year, month, day);
             const isSun = currentDate.getDay() === 0;
             const isSat = currentDate.getDay() === 6;
 
-            let cellClass = "cal-cell result-cell"; // result-cell 클래스 추가 (hover 효과 등)
+            let cellClass = "cal-cell result-cell";
             if (isSun) cellClass += " sun";
             if (isSat) cellClass += " sat";
 
-            // 오늘 날짜 표시
             const today = new Date();
             if (today.toDateString() === currentDate.toDateString()) {
                 cellClass += " today";
@@ -123,8 +111,6 @@ export default function RecommendationResultPage() {
                     style={{ cursor: hasRec ? "pointer" : "default" }}
                 >
                     <div className="cal-date-num">{day}</div>
-                    
-                    {/* 추천 데이터가 있으면 점 표시 */}
                     {hasRec && (
                         <div className="rec-indicator">
                             <span className="rec-dot"></span>
@@ -137,21 +123,48 @@ export default function RecommendationResultPage() {
         return days;
     };
 
-    // 옷 카드 렌더링 헬퍼
-    const renderClothItem = (role, clothId) => {
-        if (!clothId) return null;
-        const cloth = clothesMap[clothId];
+    // [수정됨] 옷 카드 렌더링 헬퍼
+    const renderClothItem = (role, identifier) => {
+        if (!identifier) return null;
+
+        // 1. ID로 먼저 검색 (clothes.json의 id와 일치하는지)
+        let cloth = clothesMap[identifier];
+
+        // 2. ID로 없으면 이름으로 검색 (AI가 추천 결과로 '이름'을 줬을 경우 대비)
+        if (!cloth) {
+            cloth = Object.values(clothesMap).find((c) => c.name === identifier);
+        }
         
+        // [핵심 수정] 이미지 URL 처리 함수
+        // 외부 링크(https://...)는 그대로 쓰고, 내부 파일(/images/...)만 API 주소를 붙임
+        const getImageUrl = (url) => {
+            if (!url) return "https://via.placeholder.com/150?text=No+Image";
+            if (url.startsWith("http") || url.startsWith("https")) {
+                return url; 
+            }
+            return `${API_BASE_URL}${url}`;
+        };
+
         return (
             <div className="outfit-item">
                 <div className="role-badge">{role}</div>
                 {cloth ? (
                     <>
-                        <img src={`${API_BASE_URL}${cloth.imageUrl}`} alt={cloth.name} />
+                        <img 
+                            src={getImageUrl(cloth.imageUrl)} 
+                            alt={cloth.name} 
+                            onError={(e) => {
+                                e.target.onerror = null; 
+                                e.target.src = "https://via.placeholder.com/150?text=Error";
+                            }}
+                        />
                         <span className="cloth-name">{cloth.name}</span>
                     </>
                 ) : (
-                    <div className="no-info">정보 없음 ({clothId})</div>
+                    <div className="no-info">
+                        <div style={{fontSize: "2rem", marginBottom: "5px"}}>👕</div>
+                        <span>{identifier}</span>
+                    </div>
                 )}
             </div>
         );
