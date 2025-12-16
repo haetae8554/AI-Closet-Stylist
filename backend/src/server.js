@@ -5,9 +5,12 @@ import fs from "fs";
 import path from "path";
 import multer from "multer";
 import { fileURLToPath } from "url";
-import pg from "pg"; // 1. PostgreSQL 모듈 추가
+import pg from "pg"; 
 
-// 서비스 모듈 (DB 전환으로 인해 일부 미사용 될 수 있음)
+// 1. 기본 데이터(Seed) 가져오기 (파일 경로는 ./seedData.js 라고 가정)
+import { initialClothes, initialRegions } from "./seedData.js";
+
+// 서비스 모듈
 import { getRecommendations } from "./services/geminiService.js";
 import {
   getWeatherByRequest,
@@ -22,21 +25,22 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const { Pool } = pg;
 
-// 2. DB 연결 설정 (Render 환경변수 DATABASE_URL 사용)
+// 2. DB 연결 설정
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
-// 3. 테이블 자동 생성 (서버 시작 시 실행)
+// 3. DB 초기화 및 데이터 주입 함수
 const initDB = async () => {
+  const client = await pool.connect();
   try {
-    const client = await pool.connect();
-    
-    // 옷 테이블 생성
+    await client.query('BEGIN'); // 트랜잭션 시작
+
+    // (1) 옷 테이블 생성 (ID를 TEXT로 설정 - 기존 데이터 호환)
     await client.query(`
       CREATE TABLE IF NOT EXISTS clothes (
-        id SERIAL PRIMARY KEY,
+        id TEXT PRIMARY KEY, 
         name TEXT,
         type TEXT,
         brand TEXT,
@@ -49,7 +53,16 @@ const initDB = async () => {
       );
     `);
 
-    // 추천 결과 테이블 생성 (날짜별 JSON 저장)
+    // (2) 지역 테이블 생성
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS regions (
+        reg_id TEXT PRIMARY KEY,
+        area TEXT,
+        name TEXT
+      );
+    `);
+
+    // (3) 추천 결과 테이블
     await client.query(`
       CREATE TABLE IF NOT EXISTS recommendations (
         date_key TEXT PRIMARY KEY,
@@ -57,7 +70,7 @@ const initDB = async () => {
       );
     `);
 
-    // 캘린더 테이블 생성
+    // (4) 캘린더 테이블
     await client.query(`
       CREATE TABLE IF NOT EXISTS calendar (
         id SERIAL PRIMARY KEY,
@@ -65,12 +78,71 @@ const initDB = async () => {
       );
     `);
 
-    console.log("[DB] 테이블 초기화 완료");
-    client.release();
+    // ---------------------------------------------------------
+    // 4. 데이터 주입 (Seeding) 로직
+    // ---------------------------------------------------------
+
+    // 옷 데이터 확인 및 주입
+    const clothesRes = await client.query("SELECT COUNT(*) FROM clothes");
+    if (parseInt(clothesRes.rows[0].count, 10) === 0) {
+      console.log("[DB] 옷 데이터가 비어있어 초기 데이터를 주입합니다...");
+      
+      const insertClothQuery = `
+        INSERT INTO clothes (id, name, type, brand, sub_type, thickness, colors, features, image_url, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `;
+
+      for (const cloth of initialClothes) {
+        await client.query(insertClothQuery, [
+          cloth.id,
+          cloth.name,
+          cloth.type,
+          cloth.brand || "브랜드 미지정",
+          cloth.subType || "",
+          cloth.thickness || "",
+          cloth.colors || [],
+          cloth.features || [],
+          cloth.imageUrl,
+          cloth.createdAt || new Date()
+        ]);
+      }
+      console.log(`[DB] 옷 ${initialClothes.length}개 주입 완료!`);
+    } else {
+      console.log("[DB] 옷 데이터가 이미 존재합니다. (Skip)");
+    }
+
+    // 지역 데이터 확인 및 주입
+    const regionRes = await client.query("SELECT COUNT(*) FROM regions");
+    if (parseInt(regionRes.rows[0].count, 10) === 0) {
+      console.log("[DB] 지역 데이터가 비어있어 초기 데이터를 주입합니다...");
+      
+      const insertRegionQuery = `
+        INSERT INTO regions (reg_id, area, name)
+        VALUES ($1, $2, $3)
+      `;
+
+      for (const reg of initialRegions) {
+        await client.query(insertRegionQuery, [
+          reg.regId,
+          reg.area,
+          reg.name
+        ]);
+      }
+      console.log(`[DB] 지역 ${initialRegions.length}개 주입 완료!`);
+    }
+
+    await client.query('COMMIT'); 
+    console.log("[DB] 초기화 및 데이터 확인 완료");
+
   } catch (err) {
-    console.error("[DB] 테이블 생성 실패:", err);
+    await client.query('ROLLBACK');
+    console.error("[DB] 초기화 실패:", err);
+  } finally {
+    client.release();
   }
 };
+
+// 서버 시작 시 DB 초기화 실행
 initDB();
 
 // 미들웨어
@@ -78,7 +150,7 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-// 파일 업로드 폴더 (주의: 무료 Render에서는 이미지가 재배포시 사라질 수 있음)
+// 파일 업로드 폴더 (Render 무료버전에서는 휘발성)
 const UPLOAD_DIR = path.join(__dirname, "..", "public", "images", "cloths");
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -123,11 +195,10 @@ app.post("/api/recommend", async (req, res) => {
   try {
     const { clothes = [], selected = {}, period } = req.body;
     
-    // AI 서비스 호출 (기존 로직 유지)
+    // AI 서비스 호출
     const recs = await getRecommendations(req, selected, clothes, period);
     
     if (Array.isArray(recs) && recs.length > 0) {
-        // DB 저장 함수 호출
         await saveRecommendationsToDB(recs, period);
         console.log("[SUCCESS] 추천 완료 및 DB 저장 성공");
     } else {
@@ -189,7 +260,7 @@ app.get("/api/recommend/result", async (req, res) => {
   }
 });
 
-// DB 저장 도우미 함수 (기존 파일 저장 함수 대체)
+// DB 저장 도우미 함수
 async function saveRecommendationsToDB(recs, period) {
     const startDate = period?.start ? new Date(period.start) : new Date();
     const endDate = period?.end ? new Date(period.end) : new Date();
@@ -209,7 +280,7 @@ async function saveRecommendationsToDB(recs, period) {
         await client.query('BEGIN');
 
         if (strStart === strEnd) {
-             // INSERT 하되, 날짜가 겹치면 업데이트 (Upsert)
+             // Upsert (있으면 업데이트, 없으면 삽입)
              await client.query(
                 `INSERT INTO recommendations (date_key, data) VALUES ($1, $2)
                  ON CONFLICT (date_key) DO UPDATE SET data = $2`,
@@ -217,15 +288,11 @@ async function saveRecommendationsToDB(recs, period) {
              );
         } else {
             let currentDate = new Date(startDate);
-            // 날짜별 분리 저장 로직은 기존과 동일하지만 DB 쿼리 사용
-            // (참고: 기존 로직상 recs가 전체 기간 뭉치라면 로직 조정 필요할 수 있으나, 기존 로직 따름)
-             // 주의: 기존 코드는 recs 전체를 하루하루에 넣는게 아니라 recs[0]을 첫날.. 이런 식이었습니다.
-             // 여기선 안전하게 recs 전체를 해당 날짜 범위 각각에 넣는게 아니라,
-             // 기존 로직(forEach)을 최대한 따릅니다.
+             // 날짜별 분리 저장 (단순화: 전체 추천 목록을 각 날짜에 저장)
              for (let i = 0; i < recs.length; i++) {
                 if (currentDate <= endDate) {
                     const key = formatDate(currentDate);
-                    const dayData = [recs[i]]; // 하루치 데이터 배열화
+                    const dayData = [recs[i]]; 
                     
                     await client.query(
                         `INSERT INTO recommendations (date_key, data) VALUES ($1, $2)
@@ -256,10 +323,9 @@ app.get("/api/weather/current", async (req, res) => {
   }
 });
 
-// 3) 캘린더 일정 관리 (DB 사용으로 직접 구현)
+// 3) 캘린더 일정 관리 (DB 사용)
 app.get("/api/calendar", async (req, res) => {
   try {
-    // DB에서 단일 row로 관리하거나 전체 리스트 조회
     const result = await pool.query("SELECT data FROM calendar ORDER BY id DESC LIMIT 1");
     if (result.rows.length > 0) {
         res.json(result.rows[0].data);
@@ -279,8 +345,7 @@ app.post("/api/calendar", async (req, res) => {
        return res.status(400).json({ error: "잘못된 데이터 형식입니다." });
     }
     
-    // 덮어쓰기 방식으로 저장 (기존 row 삭제 후 삽입 또는 업데이트)
-    // 간단하게 가장 최근 1개 row만 유지한다고 가정
+    // 덮어쓰기 저장
     await pool.query("DELETE FROM calendar"); 
     await pool.query("INSERT INTO calendar (data) VALUES ($1)", [JSON.stringify(events)]);
 
@@ -295,7 +360,7 @@ app.post("/api/calendar", async (req, res) => {
 app.get("/api/clothes", async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM clothes ORDER BY created_at DESC");
-        // DB 컬럼명을 프론트엔드와 맞추기 (snake_case -> camelCase)
+        // DB 컬럼(snake_case) -> JS 객체(camelCase) 변환
         const formatted = result.rows.map(row => ({
             id: row.id,
             name: row.name,
@@ -323,6 +388,8 @@ app.post("/api/clothes/upload", upload.single("image"), async (req, res) => {
 
   const { name, type, brand, subType, thickness, colors, features } = req.body;
   const imageUrl = `/images/cloths/${req.file.filename}`;
+  // ID 생성 (타임스탬프 기반)
+  const newId = Date.now().toString();
 
   if (!name || !type) {
     fs.unlinkSync(req.file.path);
@@ -336,11 +403,12 @@ app.post("/api/clothes/upload", upload.single("image"), async (req, res) => {
 
   try {
     const query = `
-        INSERT INTO clothes (name, type, brand, sub_type, thickness, colors, features, image_url)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO clothes (id, name, type, brand, sub_type, thickness, colors, features, image_url)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
     `;
     const values = [
+        newId,
         name, 
         type, 
         brand || "브랜드 미지정", 
@@ -354,7 +422,7 @@ app.post("/api/clothes/upload", upload.single("image"), async (req, res) => {
     const result = await pool.query(query, values);
     const row = result.rows[0];
 
-    // 응답 포맷 맞춤
+    // 응답 포맷
     const newCloth = {
         id: row.id,
         name: row.name,
@@ -371,7 +439,6 @@ app.post("/api/clothes/upload", upload.single("image"), async (req, res) => {
     res.json({ success: true, cloth: newCloth });
   } catch (err) {
     console.error("DB 저장 실패:", err);
-    // 실패 시 업로드된 이미지 삭제
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
@@ -385,7 +452,6 @@ app.put("/api/clothes/:id", upload.single("image"), async (req, res) => {
     const { name, type, brand, subType, thickness, colors, features } = req.body;
     
     try {
-        // 기존 데이터 확인
         const oldDataRes = await pool.query("SELECT * FROM clothes WHERE id = $1", [id]);
         if (oldDataRes.rows.length === 0) {
             if (req.file) fs.unlinkSync(req.file.path);
@@ -402,7 +468,7 @@ app.put("/api/clothes/:id", upload.single("image"), async (req, res) => {
         let newImageUrl = oldData.image_url;
         if (req.file) {
             newImageUrl = `/images/cloths/${req.file.filename}`;
-            // 기존 이미지 삭제 (로컬 파일인 경우)
+            // 기존 이미지 삭제 (로컬 파일일 경우만)
             if (oldData.image_url && oldData.image_url.startsWith("/images/cloths/")) {
                 const oldPath = path.join(__dirname, "..", "public", oldData.image_url);
                 if (fs.existsSync(oldPath)) {
@@ -425,8 +491,6 @@ app.put("/api/clothes/:id", upload.single("image"), async (req, res) => {
             RETURNING *
         `;
         
-        // colors/features가 undefined면 기존값 유지를 위해 null로 처리하지 않음 (SQL COALESCE 사용)
-        // 단, 클라이언트가 빈 값을 보낼수도 있으므로 로직 주의. 여기서는 값이 있으면 배열로 변환
         const colorsParam = colors ? stringToArray(colors) : null;
         const featuresParam = features ? stringToArray(features) : null;
 
@@ -439,7 +503,7 @@ app.put("/api/clothes/:id", upload.single("image"), async (req, res) => {
             id: row.id,
             name: row.name,
             imageUrl: row.image_url,
-            // ... 나머지 필드 매핑 생략 (프론트 필요에 따라 추가)
+            // ... (필요 시 더 많은 필드 리턴)
         }});
         
     } catch (err) {
@@ -454,7 +518,7 @@ app.delete("/api/clothes/:id", async (req, res) => {
     const { id } = req.params;
     
     try {
-        // 삭제 전 이미지 경로 확인을 위해 조회
+        // 이미지 경로 확인
         const oldDataRes = await pool.query("SELECT image_url FROM clothes WHERE id = $1", [id]);
         if (oldDataRes.rows.length === 0) {
             return res.status(404).json({ error: "삭제할 옷을 찾을 수 없음" });
