@@ -20,7 +20,6 @@ import {
 
 dotenv.config();
 
-// ES Module 환경 설정
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -37,7 +36,7 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-// 추천 데이터 저장 폴더 설정
+// 추천 데이터 저장 경로 설정
 const DATA_DIR = path.join(__dirname, "../data");
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -65,7 +64,9 @@ console.log("===========================================\n");
 // 스케줄러 실행
 startWeatherScheduler();
 
-// API Routes
+// ==========================================
+// [API Routes]
+// ==========================================
 
 // 기본 상태 체크
 app.get("/", (_req, res) => {
@@ -78,26 +79,33 @@ app.get("/", (_req, res) => {
 
 // 1) 제미나이 추천 및 데이터 저장
 app.post("/api/recommend", async (req, res) => {
+  console.log("[API] 추천 요청 시작");
   try {
     const { clothes = [], selected = {}, period } = req.body;
     
     // 제미나이 서비스 호출
     const recs = await getRecommendations(req, selected, clothes, period);
     
-    // 데이터 저장 로직 수행
-    saveRecommendationsToFile(recs, period);
+    // 결과가 배열인지 확인
+    if (Array.isArray(recs) && recs.length > 0) {
+        // 파일 저장 로직 실행
+        saveRecommendationsToFile(recs, period);
+        console.log("[SUCCESS] 추천 완료 및 JSON 파일 저장 성공");
+    } else {
+        console.warn("[WARN] 생성된 추천 결과가 비어있습니다.");
+    }
 
-    res.json({ success: true, message: "추천 완료 및 저장됨" });
+    res.json({ success: true, message: "추천 완료", recommendations: recs });
   } catch (e) {
-    console.error("추천 생성 중 오류:", e);
+    console.error("[ERROR] 추천 생성 중 오류:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
-// 추천 결과 조회 (Frontend에서 호출)
+// 추천 결과 조회 (수정됨: 날짜 범위 지원)
 app.get("/api/recommend/result", (req, res) => {
   try {
-    const { date } = req.query; // 조회할 날짜 (YYYY-MM-DD)
+    const { date, startDate, endDate } = req.query; 
     
     if (!fs.existsSync(REC_FILE_PATH)) {
       return res.json([]); 
@@ -105,10 +113,31 @@ app.get("/api/recommend/result", (req, res) => {
 
     const fileData = fs.readFileSync(REC_FILE_PATH, "utf8");
     const allData = JSON.parse(fileData);
+    let result = [];
 
-    // 특정 날짜 요청 시 해당 날짜 데이터 반환, 없으면 빈 배열
-    const targetDate = date || new Date().toISOString().split('T')[0];
-    const result = allData[targetDate] || [];
+    // Case 1: 날짜 범위(startDate ~ endDate)가 주어진 경우
+    if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        // 반복문을 돌며 범위 내의 모든 데이터를 수집
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const key = `${year}-${month}-${day}`;
+            
+            if (allData[key]) {
+                // allData[key]는 배열이므로 펼쳐서(result)에 추가
+                result.push(...allData[key]);
+            }
+        }
+    } 
+    // Case 2: 특정 날짜(date)만 주어진 경우 혹은 파라미터가 없는 경우(오늘 날짜)
+    else {
+        const targetDate = date || new Date().toISOString().split('T')[0];
+        result = allData[targetDate] || [];
+    }
 
     res.json(result);
   } catch (e) {
@@ -117,43 +146,61 @@ app.get("/api/recommend/result", (req, res) => {
   }
 });
 
-// 추천 데이터 저장 헬퍼 함수
+// 파일 저장 함수
 function saveRecommendationsToFile(recs, period) {
   try {
     let allData = {};
+    
+    // 기존 파일이 있으면 읽어오기
     if (fs.existsSync(REC_FILE_PATH)) {
       const existing = fs.readFileSync(REC_FILE_PATH, "utf8");
-      allData = JSON.parse(existing);
+      try {
+        allData = JSON.parse(existing);
+      } catch (parseError) {
+        allData = {};
+      }
     }
 
     const startDate = period?.start ? new Date(period.start) : new Date();
     const endDate = period?.end ? new Date(period.end) : new Date();
     
-    // 날짜 포맷팅 함수 (YYYY-MM-DD)
-    const formatDate = (d) => d.toISOString().split('T')[0];
+    // 날짜 포맷 (YYYY-MM-DD)
+    const formatDate = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
 
-    // 단일 날짜 요청 여부 확인
-    const isSingleDay = formatDate(startDate) === formatDate(endDate);
+    const strStart = formatDate(startDate);
+    const strEnd = formatDate(endDate);
 
-    if (isSingleDay) {
-      // 단일 날짜는 해당 날짜 키에 전체 배열(옵션 3개)을 덮어씀
-      const key = formatDate(startDate);
-      allData[key] = recs;
+    // 단일 날짜인지 확인
+    if (strStart === strEnd) {
+      // 단일 날짜: 해당 날짜 키에 전체 결과 덮어쓰기
+      allData[strStart] = recs;
+      console.log(`[SAVE] 단일 날짜 저장 (${strStart}): 코디 ${recs.length}개`);
     } else {
-      // 다중 날짜는 날짜별로 하나씩 매핑하여 덮어씀
+      // 여러 날짜: 결과 배열을 순서대로 날짜에 매핑
       let currentDate = new Date(startDate);
-      recs.forEach((rec) => {
+      
+      recs.forEach((rec, index) => {
+        // 날짜 범위 안인지 체크
         if (currentDate <= endDate) {
           const key = formatDate(currentDate);
-          // 다중 날짜 요청일 경우 배열로 감싸서 저장 통일성 유지
+          // 저장 시 구조 통일: 하루에 여러 추천이 있을 수 있으므로 배열로 저장
           allData[key] = [rec]; 
+          
+          // 다음 날짜로 이동
           currentDate.setDate(currentDate.getDate() + 1);
         }
       });
+      console.log(`[SAVE] 다중 날짜 저장 (${strStart} ~ ${strEnd})`);
     }
 
+    // 파일 쓰기
     fs.writeFileSync(REC_FILE_PATH, JSON.stringify(allData, null, 2), "utf8");
-    console.log("추천 데이터 파일 저장 완료");
+    
   } catch (err) {
     console.error("파일 저장 실패:", err);
   }
@@ -263,7 +310,6 @@ app.post("/api/clothes/upload", upload.single("image"), (req, res) => {
   }
 });
 
-// 서버 시작
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`[server] running on http://localhost:${PORT}`);
