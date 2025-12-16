@@ -6,98 +6,89 @@ import { getWeatherByRequest } from "./WeatherService.js";
 dotenv.config();
 const { Pool } = pg;
 
-// 2. DB 연결 설정
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
-// Gemini 모델 및 설정
 const GEMINI_MODEL = "gemma-3-12b-it"; 
 const MAX_RETRIES = 3; 
 
-// [추가] Date 객체를 한국 시간(KST) 기준의 Date 객체로 변환하는 헬퍼
+// [중요] Date 객체를 한국 시간(KST) 기준의 Date 객체로 변환하는 헬퍼
+// 이 함수는 'UTC 시간'을 'KST 시간값'을 가진 Date 객체로 '이동'시킵니다.
 function toKST(date) {
-  // 현재 Date 객체의 타임스탬프(ms)
   const utc = date.getTime() + (date.getTimezoneOffset() * 60 * 1000);
   const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
   return new Date(utc + KR_TIME_DIFF);
 }
 
-// API 데이터 부재 시 추정 날씨 반환 (KST 기준 월 사용)
 function getSeasonalWeather(kstDate) {
     const month = kstDate.getMonth() + 1;
-    
-    if (month >= 3 && month <= 5) {
-        return "평균 기온 10~20도, 일교차가 큰 봄 날씨 예상";
-    } else if (month >= 6 && month <= 8) {
-        return "평균 기온 25~30도, 덥고 습한 여름 날씨 예상";
-    } else if (month >= 9 && month <= 11) {
-        return "평균 기온 10~20도, 선선한 가을 날씨 예상";
-    } else {
-        return "평균 기온 영하~5도, 춥고 건조한 겨울 날씨 예상";
-    }
+    if (month >= 3 && month <= 5) return "평균 기온 10~20도, 일교차가 큰 봄 날씨 예상";
+    else if (month >= 6 && month <= 8) return "평균 기온 25~30도, 덥고 습한 여름 날씨 예상";
+    else if (month >= 9 && month <= 11) return "평균 기온 10~20도, 선선한 가을 날씨 예상";
+    else return "평균 기온 영하~5도, 춥고 건조한 겨울 날씨 예상";
 }
 
-// 컨텍스트 텍스트 생성
 async function formatContextForPrompt(weatherData, period) {
     let resultString = "";
     
-    // 기간 설정 (입력이 없으면 현재 시간 사용)
-    // start/end가 문자열로 들어오더라도 new Date()로 처리하되, 
-    // 반복문 내부에서 KST 변환을 수행하여 날짜 키를 맞춥니다.
-    const start = period?.start ? new Date(period.start) : new Date();
-    const end = period?.end ? new Date(period.end) : new Date();
-    
-    // 3. DB에서 캘린더 일정 가져오기
+    // [수정] 기간이 없으면(null), 서버 시간이 아닌 "한국 시간 기준 오늘"을 사용
+    let start, end;
+    if (period?.start) {
+        start = new Date(period.start);
+        end = period.end ? new Date(period.end) : new Date(period.start);
+    } else {
+        // period가 없으면 현재 서버 시간(UTC)을 한국 시간으로 변환하여 기준 잡음
+        // 주의: 여기서 toKST를 쓰면 시각이 9시간 밀리므로, 날짜 계산 시 이 '밀린 시간'을 기준으로 해야 함
+        const kstNow = toKST(new Date()); 
+        start = kstNow;
+        end = kstNow;
+    }
+
+    // 캘린더 가져오기
     let allEvents = {};
     try {
         const res = await pool.query("SELECT data FROM calendar ORDER BY id DESC LIMIT 1");
-        if (res.rows.length > 0) {
-            allEvents = res.rows[0].data || {};
-        }
+        if (res.rows.length > 0) allEvents = res.rows[0].data || {};
     } catch (e) {
         console.error("DB 일정 로드 실패:", e);
     }
 
     const weatherItems = weatherData?.landFcst?.items || [];
 
-    // 날짜 반복
-    // 주의: d는 루프 제어용 변수이고, 실제 날짜 문자열(YYYY-MM-DD) 생성은 kstDate를 사용
+    // 날짜 반복 (start와 end가 이미 KST로 보정된 시간이거나, UTC 00:00(한국 09:00)이므로 그대로 루프)
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         
-        // [수정] 서버 시간이 아닌 KST 기준으로 연/월/일 추출
-        const kstDate = toKST(d);
+        // d가 이미 KST로 조정된 시간이거나, 날짜만 있는 UTC 00:00이라면
+        // getFullYear() 등이 한국 날짜와 일치하게 됩니다.
+        // 다만, 안전을 위해 루프 내부에서도 한 번 더 KST 변환(혹은 유지)을 고려해야 하는데,
+        // 위에서 start/end를 이미 처리했으므로 여기선 d를 그대로 씁니다.
+        // (단, period가 문자열로 들어온 경우 Node는 UTC 00시로 인식 -> 한국 09시. 날짜 일치함)
         
-        const year = kstDate.getFullYear();
-        const month = String(kstDate.getMonth() + 1).padStart(2, '0');
-        const day = String(kstDate.getDate()).padStart(2, '0');
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
         
-        // DB나 API 매칭을 위한 Key 생성 (한국 시간 기준)
         const dateKey = `${year}-${month}-${day}`; 
         const dateKeyNoHyphen = `${year}${month}${day}`;
 
-        // 일정 처리
+        // 일정
         const dayEvents = allEvents[dateKey] || [];
         const eventText = dayEvents.length > 0 
             ? `일정: ${dayEvents.map(e => e.title).join(", ")}` 
             : "일정: 특별한 일정 없음 (평상복)";
 
-        // 날씨 처리
+        // 날씨 매칭
         let weatherDesc = "";
         const matchedWeathers = weatherItems.filter(item => {
-            // 기상청 데이터(TM_EF) 형식: YYYYMMDDHHmm
             const fcstDateRaw = item.tmEf || item.TM_EF || ""; 
             return fcstDateRaw.startsWith(dateKeyNoHyphen);
         });
 
         if (matchedWeathers.length > 0) {
-            const temps = matchedWeathers
-                .map(it => Number(it.TA || it.ta || -99))
-                .filter(t => t > -99);
-            
+            const temps = matchedWeathers.map(it => Number(it.TA || it.ta || -99)).filter(t => t > -99);
             const skyStatus = matchedWeathers[0].WF || matchedWeathers[0].wf || "맑음";
-            
             if (temps.length > 0) {
                 const minT = Math.min(...temps);
                 const maxT = Math.max(...temps);
@@ -106,13 +97,11 @@ async function formatContextForPrompt(weatherData, period) {
                 weatherDesc = `날씨(예보): ${skyStatus}`;
             }
         } else {
-            // 추정 날씨도 KST 기준 날짜 객체 전달
-            const seasonal = getSeasonalWeather(kstDate);
+            const seasonal = getSeasonalWeather(d);
             weatherDesc = `날씨(추정): 예보 데이터 없음. ${month}월 통계 기반 - ${seasonal}`;
         }
 
-        // 요일도 KST 기준으로 구함
-        resultString += `[${month}/${day} (${getDayName(kstDate)})]\n  - ${weatherDesc}\n  - ${eventText}\n\n`;
+        resultString += `[${dateKey} (${getDayName(d)})]\n  - ${weatherDesc}\n  - ${eventText}\n\n`;
     }
 
     const locationStr = weatherData?.location 
@@ -127,9 +116,7 @@ function getDayName(date) {
     return days[date.getDay()];
 }
 
-// 옷 추천 메인 함수
 export async function getRecommendations(req, selected, clothes, period) {
-    // API 키 배열 생성 (순서대로 1, 2, 3)
     const apiKeys = [
         process.env.GEMINI_API_KEY1,
         process.env.GEMINI_API_KEY2,
@@ -143,19 +130,28 @@ export async function getRecommendations(req, selected, clothes, period) {
         console.error("WeatherService Error:", error);
     }
 
+    // 컨텍스트 생성
     const contextString = await formatContextForPrompt(weatherData, period);
 
-    // 시작/종료일 비교 시에도 KST 기준을 고려하거나, 
-    // 단순 문자열 비교를 위해 입력받은 원본 period 객체 활용이 안전할 수 있음.
-    // 여기서는 간단히 toDateString 비교 유지 (큰 차이 없음)
-    const startDate = period?.start ? new Date(period.start) : new Date();
-    const endDate = period?.end ? new Date(period.end) : new Date();
+    // [수정] start/end 계산 시에도 KST 고려 (단일 날짜 여부 판단용)
+    let startDate, endDate;
+    if (period?.start) {
+        startDate = new Date(period.start);
+        endDate = period.end ? new Date(period.end) : new Date(period.start);
+    } else {
+        const kstNow = toKST(new Date());
+        startDate = kstNow;
+        endDate = kstNow;
+    }
+    
+    // toDateString()으로 비교 (날짜만 비교)
     const isSingleDay = startDate.toDateString() === endDate.toDateString();
 
     const countInstruction = isSingleDay 
         ? "현재 '단일 날짜' 요청입니다. 해당 날짜의 날씨와 TPO에 맞춰 **서로 다른 무드의 코디 조합을 3가지** 제안하세요."
         : "현재 '여러 날짜' 요청입니다. **각 날짜별로 최적의 코디를 1개씩** 제안하세요.";
 
+    // [수정] 프롬프트: JSON 출력 시 'date' 필드를 반드시 포함하도록 강력 지시
     const prompt = `
 당신은 최고의 AI 패션 스타일리스트입니다.
 아래 제공된 **[날짜별 상황]**을 면밀히 분석하여, 사용자가 가진 옷으로 가장 적절한 코디를 추천해주세요.
@@ -174,8 +170,9 @@ ${JSON.stringify(selected, null, 2)}
 [필수 규칙]
 1. 응답은 반드시 **JSON 배열** 형식이어야 합니다.
 2. **수량 규칙**: ${countInstruction}
-3. JSON 객체 구조:
+3. JSON 객체 구조 (반드시 준수):
    {
+     "date": "YYYY-MM-DD (해당 코디가 추천된 날짜를 정확히 기입)",
      "outer": "옷ID (없으면 null)",
      "top": "옷ID",
      "bottom": "옷ID",
@@ -184,10 +181,12 @@ ${JSON.stringify(selected, null, 2)}
    }
 4. 날씨와 TPO(일정)를 최우선으로 고려하세요.
 5. 고정된 아이템이 있다면 절대 바꾸지 마세요.
+6. [날짜별 상황]에 명시된 날짜를 "date" 필드에 정확히 매핑해야 합니다.
 
 출력 예시:
 [
   {
+    "date": "2023-12-23",
     "outer": "coat-123",
     "top": "knit-55",
     "bottom": "jean-22",
@@ -205,14 +204,10 @@ ${JSON.stringify(selected, null, 2)}
     while (attempt < MAX_RETRIES) {
         try {
             const currentKey = apiKeys[attempt]; 
-            
-            if (!currentKey) {
-                throw new Error(`API Key not found for attempt ${attempt + 1}`);
-            }
+            if (!currentKey) throw new Error(`API Key not found for attempt ${attempt + 1}`);
 
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${currentKey}`;
-            
-            console.log(`[Gemini] 요청 시도 ${attempt + 1} (API Key ${attempt + 1} 사용)`);
+            console.log(`[Gemini] 요청 시도 ${attempt + 1}`);
             
             const res = await fetch(url, {
                 method: "POST",
@@ -221,9 +216,7 @@ ${JSON.stringify(selected, null, 2)}
             });
 
             if (!res.ok) {
-                if (res.status === 429 || res.status >= 500) {
-                    throw new Error(`Retryable Error: ${res.status}`);
-                }
+                if (res.status === 429 || res.status >= 500) throw new Error(`Retryable Error: ${res.status}`);
                 console.error(`[Gemini] 요청 실패: ${res.status}`);
                 return []; 
             }
@@ -233,23 +226,15 @@ ${JSON.stringify(selected, null, 2)}
             const jsonStart = text.indexOf("[");
             const jsonEnd = text.lastIndexOf("]");
 
-            if (jsonStart === -1 || jsonEnd === -1) {
-                 throw new Error("Invalid JSON format");
-            }
+            if (jsonStart === -1 || jsonEnd === -1) throw new Error("Invalid JSON format");
 
             const jsonPart = text.slice(jsonStart, jsonEnd + 1);
             return JSON.parse(jsonPart);
 
         } catch (error) {
             console.error(`[Gemini] 오류 발생 (시도 ${attempt + 1}):`, error.message);
-            
             attempt++; 
-
-            if (attempt >= MAX_RETRIES) {
-                console.error("[Gemini] 모든 API 키 시도 실패");
-                return [];
-            }
-            
+            if (attempt >= MAX_RETRIES) return [];
             await new Promise(r => setTimeout(r, 1000 * attempt));
         }
     }
