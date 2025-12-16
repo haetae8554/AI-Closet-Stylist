@@ -9,4 +9,4 @@ const PROD_URL = "https://ai-closet-stylist.onrender.com";
 
 // 코드에서 사용할 주소
 //export const API_BASE_URL = LOCAL_IP;
- export const API_BASE_URL = PROD_URL;
+export const API_BASE_URL = PROD_URL;
