@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import "./AIResult.css";
+import { API_BASE_URL } from "./apiConfig";
 
 export default function AIResult() {
     const location = useLocation();
@@ -21,7 +22,8 @@ export default function AIResult() {
             try {
                 // targetDate가 있으면 쿼리 스트링으로 전달, 없으면 오늘 날짜 기준
                 const dateQuery = targetDate ? `?date=${targetDate}` : "";
-                const response = await fetch(`http://localhost:3001/api/recommend/result${dateQuery}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api//api/recommend/result${dateQuery}`);
                 
                 if (response.ok) {
                     const data = await response.json();
