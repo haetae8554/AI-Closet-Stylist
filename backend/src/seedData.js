@@ -2,34 +2,6 @@
 
 export const initialClothes = [
     {
-        "id": "1765802153905",
-        "name": "1",
-        "type": "아우터",
-        "brand": "브랜드 미지정",
-        "subType": "",
-        "colors": ["#000000"],
-        "thickness": "",
-        "features": [],
-        "imageUrl": "https://image.msscdn.net/thumbnails/images/goods_img/20230705/3395775/3395775_17198122554182_big.jpg?w=1200",
-        "createdAt": "2025-12-15T12:35:53.905Z"
-    },
-    {
-        "id": "1765783964516",
-        "name": "스탠다드 푸퍼 다운 자켓",
-        "type": "아우터",
-        "brand": "데상트",
-        "subType": "패딩",
-        "colors": [
-            "#000000"
-        ],
-        "thickness": "두꺼움",
-        "features": [
-            "방한"
-        ],
-        "imageUrl": "https://image.msscdn.net/thumbnails/images/goods_img/20251105/5691133/5691133_17623435408884_big.jpg?w=1200",
-        "createdAt": "2025-12-15T07:32:44.516Z"
-    },
-    {
         "id": "outer-001",
         "name": "헤비 다운 파카",
         "brand": "무신사 스탠다드",
