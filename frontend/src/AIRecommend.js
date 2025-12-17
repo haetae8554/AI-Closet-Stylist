@@ -12,7 +12,24 @@ export default function AIRecommend() {
     const [endDate, setEndDate] = useState(null);
     const [events, setEvents] = useState({});
   
-    // 1. 달력 일정 데이터 로드
+    // [기존] 로딩(스피너) 팝업 상태
+    const [showLoadingPopup, setShowLoadingPopup] = useState(false);
+    
+    // [추가] 페이지 진입 시 안내 팝업 상태
+    const [showGuidePopup, setShowGuidePopup] = useState(false);
+
+    // 1. 페이지 진입 시 안내 팝업 띄우기
+    useEffect(() => {
+        // 페이지에 들어오면 무조건 안내 팝업을 띄웁니다.
+        // (만약 세션당 1번만 띄우고 싶다면 sessionStorage 로직 추가 가능)
+        setShowGuidePopup(true);
+    }, []);
+
+    const closeGuidePopup = () => {
+        setShowGuidePopup(false);
+    };
+
+    // 2. 달력 일정 데이터 로드
     useEffect(() => {
         fetch(`${API_BASE_URL}/api/calendar`)
             .then((res) => {
@@ -37,43 +54,33 @@ export default function AIRecommend() {
         setViewDate(newDate);
     };
 
-    // [복구] 날짜 클릭 핸들러 (시작일 -> 종료일 -> 초기화 순서)
     const handleDateClick = (day) => {
         const clickedDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
 
         if (!startDate || (startDate && endDate)) {
-            // 1. 아무것도 없거나, 이미 기간이 완성되어 있으면 -> 새로 시작
             setStartDate(clickedDate);
             setEndDate(null);
         } else if (startDate && !endDate) {
-            // 2. 시작일만 있는 경우
             if (clickedDate < startDate) {
-                // 시작일보다 이전 날짜를 찍으면 -> 시작일을 변경
                 setStartDate(clickedDate);
             } else {
-                // 시작일 이후 날짜를 찍으면 -> 종료일 설정 (기간 완성)
                 setEndDate(clickedDate);
             }
         }
     };
 
-    // [복구] 하단 기간 표시 텍스트 로직
     const getPeriodText = () => {
         if (!startDate) {
             return "👆 달력에서 AI 추천을 받을 시작일을 선택해주세요.";
         }
-        
         const startStr = `${startDate.getMonth() + 1}월 ${startDate.getDate()}일`;
-        
         if (!endDate) {
             return `시작: ${startStr} ~ (종료일을 선택해주세요)`;
         }
-        
         const endStr = `${endDate.getMonth() + 1}월 ${endDate.getDate()}일`;
         return `✅ 선택된 기간: ${startStr} ~ ${endStr}`;
     };
 
-    // 달력 렌더링
     const renderCalendarGrid = () => {
         const year = viewDate.getFullYear();
         const month = viewDate.getMonth();
@@ -93,18 +100,16 @@ export default function AIRecommend() {
             const dateKey = getDateKey(year, month, day);
             const dayEvents = events[dateKey] || [];
 
-            // 기본 클래스
             let className = "day-cell";
             if (isSun) className += " sun";
             if (isSat) className += " sat";
 
-            // [핵심] 기간 선택 시 클래스 추가 로직
             if (startDate && currentDate.getTime() === startDate.getTime()) {
-                className += " range-start"; // 시작일 (파란색 배경)
+                className += " range-start";
             } else if (endDate && currentDate.getTime() === endDate.getTime()) {
-                className += " range-end";   // 종료일 (파란색 배경)
+                className += " range-end";
             } else if (startDate && endDate && currentDate > startDate && currentDate < endDate) {
-                className += " in-range";    // 기간 사이 (연한 파란색)
+                className += " in-range";
             }
 
             days.push(
@@ -126,7 +131,6 @@ export default function AIRecommend() {
         return days;
     };
 
-    // ... 옷 데이터 및 추천 로직 (기존 유지) ...
     const [allClothes, setAllClothes] = useState([]);
     const [selectedItems, setSelectedItems] = useState({
         아우터: null, 상의: null, 하의: null, 신발: null,
@@ -184,6 +188,8 @@ export default function AIRecommend() {
 
         try {
             setLoading(true);
+            setShowLoadingPopup(true); // 실제 로딩 시작 시 스피너 팝업 띄움
+
             let url = `${API_BASE_URL}/api/recommend`;
             if (location.lat && location.lon) {
                 url += `?lat=${location.lat}&lon=${location.lon}`;
@@ -203,6 +209,7 @@ export default function AIRecommend() {
             });
 
             const data = await res.json();
+            
             navigate("/AI/daily", {
                 state: {
                     allClothes,
@@ -216,15 +223,17 @@ export default function AIRecommend() {
             });
         } catch (err) {
             console.error("AI 추천 요청 실패:", err);
-            alert("AI 추천 요청 중 오류가 발생했습니다.");
+            setTimeout(() => {
+                alert("AI 추천 요청 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+            }, 300);
         } finally {
             setLoading(false);
+            setShowLoadingPopup(false);
         }
     };
 
     return (
         <>
-            {/* [복구] CSS 스타일 복구: .range-start, .range-end, .in-range 추가됨 */}
             <style>{`
                 .ai-cal-events {
                     display: flex;
@@ -255,7 +264,7 @@ export default function AIRecommend() {
                     align-items: stretch;
                     padding: 6px;
                     cursor: pointer;
-                    border-radius: 6px; /* 모서리 둥글게 */
+                    border-radius: 6px;
                     transition: all 0.2s;
                     border: 1px solid transparent;
                 }
@@ -273,28 +282,56 @@ export default function AIRecommend() {
                     justify-content: center;
                     border-radius: 50%;
                 }
-
-                /* [여기부터 복구된 스타일] */
-                /* 시작일과 종료일: 진한 파란색 배경 + 흰색 글씨 */
                 .calendar-grid .day-cell.range-start, 
                 .calendar-grid .day-cell.range-end {
                     background-color: #3a82f5ff !important;
                     color: white !important;
-                    
                 }
-                
-                /* 시작일/종료일 내부의 텍스트 색상 강제 변경 */
                 .calendar-grid .day-cell.range-start .day-number,
                 .calendar-grid .day-cell.range-end .day-number {
                     background-color: transparent;
                     color: white;
                 }
-                
-                /* 기간 사이 구간: 연한 파란색 배경 */
                 .calendar-grid .day-cell.in-range {
                     background-color: #8eb9f0ff !important;
                 }
             `}</style>
+            
+            {/* [추가] 1. 페이지 진입 시 안내 팝업 */}
+            {showGuidePopup && (
+                <div className="loading-popup-overlay">
+                    <div className="loading-popup-content">
+                        <h3>AI 추천 서비스 이용 안내</h3>
+                        <div className="loading-guide-box">
+                            <p><strong>소요 시간 안내</strong><br/>
+                            서버 상태에 따라 추천 결과를 받아오는 데<br/>
+                            <strong>약 30초 ~ 1분</strong> 정도 소요될 수 있습니다.</p>
+                            
+                            <p><strong>일시적 오류 발생 시</strong><br/>
+                            사용량이 많아 결과가 뜨지 않을 경우,<br/>
+                            잠시 기다리셨다가 다시 시도해 주세요.</p>
+                            
+                            <p><strong>옷 선택 관련 안내</strong><br/>
+                            선택하신 옷이 날씨, 일정, 코디 조화에 맞지 않으면<br/>
+                            AI가 <strong>더 적절한 아이템으로 변경</strong>하여 추천할 수 있습니다.</p>
+                        </div>
+                        <button className="popup-confirm-btn" onClick={closeGuidePopup}>
+                            확인했습니다
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* [추가] 2. 실제 로딩 중(스피너) 팝업 */}
+            {showLoadingPopup && (
+                <div className="loading-popup-overlay">
+                    <div className="loading-popup-content">
+                        <div className="loading-spinner"></div>
+                        <h3>AI가 최적의 코디를 분석 중입니다...</h3>
+                        <p style={{marginTop:"10px", color:"#666"}}>잠시만 기다려 주세요! ✨</p>
+                    </div>
+                </div>
+            )}
 
             <nav id="nav3">
                 <Link to="/" className="logo">AI Closet</Link>
@@ -341,7 +378,6 @@ export default function AIRecommend() {
                         </div>
                     </div>
                     
-                    {/* 기간 선택 안내 문구 */}
                     <div className="selected-range-info" style={{
                         marginTop: "15px",
                         padding: "12px",
@@ -446,7 +482,7 @@ export default function AIRecommend() {
                                 }}
                             >
                                 {loading 
-                                    ? "AI 분석 중..." 
+                                    ? "분석 중..." 
                                     : (!startDate || !endDate) 
                                         ? "기간을 설정해주세요"
                                         : "✨ AI 추천받기"

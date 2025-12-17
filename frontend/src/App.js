@@ -20,7 +20,7 @@ function normalizeItem(raw, idx = 0) {
 function pad2(n) { return n < 10 ? "0" + n : String(n); }
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
-// [수정됨] 날씨 아이콘 로직 개선 (텍스트 우선 확인)
+// 날씨 아이콘 로직 개선 (텍스트 우선 확인)
 function getWeatherEmoji(skyCode, summaryText = "") {
   const code = String(skyCode || "");
   const text = String(summaryText || "");
@@ -52,6 +52,7 @@ function formatShortDate(date) {
 export default function App() {
   const navigate = useNavigate();
 
+  // 기존 상태들
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [weatherError, setWeatherError] = useState("");
@@ -62,6 +63,25 @@ export default function App() {
 
   const [aiResult, setAiResult] = useState([]);
   const [allClothes, setAllClothes] = useState([]);
+
+  // [추가] 서버 대기 안내 팝업 상태 관리
+  const [showServerPopup, setShowServerPopup] = useState(false);
+
+  // [추가] 최초 접속 시 팝업 띄우기 (세션 스토리지 체크)
+  useEffect(() => {
+    // sessionStorage에 'serverVisited' 기록이 없으면 첫 접속으로 간주
+    const hasVisited = sessionStorage.getItem("serverVisited");
+    
+    if (!hasVisited) {
+      setShowServerPopup(true); // 팝업 열기
+      sessionStorage.setItem("serverVisited", "true"); // 방문 기록 저장
+    }
+  }, []);
+
+  // [추가] 팝업 닫기 함수
+  const closeServerPopup = () => {
+    setShowServerPopup(false);
+  };
 
   // 캘린더 조회
   useEffect(() => {
@@ -210,7 +230,7 @@ export default function App() {
   const goToAI = () => navigate("/AI");
   const goToDetail = (item) => navigate(`/closet/detail?id=${encodeURIComponent(item.id)}`, { state: { item, from: "home" } });
 
-  // [수정됨] 날씨 렌더링 함수 (온도 처리 로직 개선)
+  // 날씨 렌더링 함수
   const renderWeather = () => {
     if (weatherLoading) return <p className="weather-message">날씨 정보 로딩 중...</p>;
     if (weatherError) return <p className="weather-message">{weatherError}</p>;
@@ -229,8 +249,6 @@ export default function App() {
     if (weather.landFcst?.items?.[0]) {
       const main = weather.landFcst.items[0];
       
-      // [중요] temp가 없으면 T(현재기온)를 먼저 찾고, 없으면 TA(예상기온)를 찾음
-      // API 응답 첫 줄에는 보통 TA가 없고 T만 있는 경우가 많음
       if (!temp) {
          temp = main.T || main.TA; 
       }
@@ -240,7 +258,6 @@ export default function App() {
       if (pop === "0" || !pop) pop = main.POP || "0";
     }
 
-    // 강수확률 이모지 조건 처리 (30% 이상일 때만 우산)
     const popVal = parseInt(pop, 10);
     const popEmoji = popVal >= 30 ? "☔" : "💧";
 
@@ -262,7 +279,6 @@ export default function App() {
     return (
         <div className="weather-card">
             <div className="weather-icon">{getWeatherEmoji(skyCode, summary)}</div>
-            {/* 온도가 있으면 표시, 없으면 -- 표시 */}
             <div className="weather-temp">{Number(temp) > -99 ? `${temp}℃` : "--℃"}</div>
             
             <div className="weather-detail-row">
@@ -281,9 +297,7 @@ export default function App() {
                       <span className="forecast-desc">{fv.data.WF}</span>
                     </div>
                     <div className="forecast-right">
-                      {/* [수정] 텍스트(WF) 전달하여 아이콘 정확도 향상 */}
                       <span className="forecast-emoji">{getWeatherEmoji(fv.data.SKY, fv.data.WF)}</span>
-                      {/* [수정] TA가 없으면 T 표시 */}
                       <span className="forecast-temp">{fv.data.TA || fv.data.T}℃</span>
                     </div>
                   </div>
@@ -318,7 +332,6 @@ export default function App() {
         <>
             <div className="hero-outfit-container">
                 <div className="hero-outfit-card">
-                    {/* 사진 영역: 가로 꽉 채움 */}
                     <div className="hero-visuals">
                         {heroVisuals.length > 0 ? heroVisuals.map((item, i) => (
                             <div key={i} className="visual-item">
@@ -329,7 +342,6 @@ export default function App() {
                             </div>
                         )) : <p>이미지 정보 없음</p>}
                     </div>
-                    {/* 설명 영역: 사진 아래로 배치 */}
                     <div className="hero-info">
                         <span className="hero-badge">BEST LOOK</span>
                         <div className="hero-description-box">
@@ -374,6 +386,22 @@ export default function App() {
 
   return (
     <>
+      {/* [추가] 서버 대기 안내 팝업 UI */}
+      {showServerPopup && (
+        <div className="server-popup-overlay">
+          <div className="server-popup-content">
+            <h3>서버 연결 안내</h3>
+            <p>
+              서버가 절전 모드에서 깨어나는 중일 경우<br/>
+              데이터(옷, 날씨 등)를 불러오는 데<br/>
+              <strong>약 30초~1분</strong> 정도 소요될 수 있습니다.
+            </p>
+            <p className="sub-text">잠시만 기다려 주시면 정상적으로 표시됩니다.<br/>불편을 드려 죄송합니다.</p>
+            <button onClick={closeServerPopup}>확인했습니다</button>
+          </div>
+        </div>
+      )}
+
       <nav id="nav3">
         <Link to="/" className="logo">AI Closet</Link>
         <ul>
