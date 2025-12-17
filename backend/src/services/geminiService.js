@@ -1,7 +1,6 @@
-// [삭제] import fetch from "node-fetch"; (SDK 내장 기능 사용)
-import { GoogleGenAI } from "@google/genai"; // 최신 SDK 임포트
+import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import pg from "pg"; 
+import pg from "pg";
 import { getWeatherByRequest } from "./WeatherService.js";
 
 dotenv.config();
@@ -12,11 +11,7 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
-// 모델 버전을 2.5 Flash로 변경
-const GEMINI_MODEL = "gemini-2.5-flash"; 
-const MAX_RETRIES = 3; 
 
-// [중요] Date 객체를 한국 시간(KST) 기준의 Date 객체로 변환하는 헬퍼
 function toKST(date) {
   const utc = date.getTime() + (date.getTimezoneOffset() * 60 * 1000);
   const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
@@ -31,7 +26,6 @@ function getSeasonalWeather(kstDate) {
     else return "평균 기온 영하~5도, 춥고 건조한 겨울 날씨 예상";
 }
 
-// (이 함수는 로직이 완벽하므로 그대로 유지합니다)
 async function formatContextForPrompt(weatherData, period) {
     let resultString = "";
     
@@ -104,16 +98,48 @@ function getDayName(date) {
     return days[date.getDay()];
 }
 
-// ---------------------------------------------------------
-// [핵심 수정] Gemini 2.5 Flash SDK 사용 및 JSON 모드 적용
-// ---------------------------------------------------------
+
 export async function getRecommendations(req, selected, clothes, period) {
-    const apiKeys = [
+    // 1. 사용할 API 키 목록
+    const availableKeys = [
         process.env.GEMINI_API_KEY1,
         process.env.GEMINI_API_KEY2,
         process.env.GEMINI_API_KEY3
-    ];
+    ].filter(key => key !== undefined && key !== ""); // 빈 키 제거
 
+    if (availableKeys.length === 0) {
+        console.error("❌ [Error] 사용 가능한 API 키가 없습니다.");
+        return [];
+    }
+
+    // 2. 주력 모델 목록
+    const MAIN_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+    
+    // 3. 비상용 모델
+    const SAFETY_MODEL = "gemma-3-12b-it";
+
+    // -------------------------------------------------------
+    // [전략] 시도할 후보군(Candidate) 생성 및 셔플
+    // (Key1, Flash), (Key1, Lite), (Key2, Flash)... 등 모든 조합 생성
+    // -------------------------------------------------------
+    let attemptQueue = [];
+    
+    availableKeys.forEach(key => {
+        MAIN_MODELS.forEach(modelName => {
+            attemptQueue.push({ key: key, model: modelName });
+        });
+    });
+
+    // 셔플 (Fisher-Yates Shuffle 대용: 랜덤 정렬)
+    // 이로 인해 호출 때마다 Flash와 Lite, 그리고 Key 1,2,3의 순서가 무작위로 섞임
+    attemptQueue.sort(() => Math.random() - 0.5);
+
+    // 마지막 안전장치 추가 (비상용 모델은 맨 뒤에 한 번만 시도)
+    // 키는 가장 첫 번째 키(혹은 랜덤)를 사용
+    attemptQueue.push({ key: availableKeys[0], model: SAFETY_MODEL });
+
+
+    // --- 데이터 준비 ---
     let weatherData = null;
     try {
         weatherData = await getWeatherByRequest(req);
@@ -138,7 +164,6 @@ export async function getRecommendations(req, selected, clothes, period) {
         ? "현재 '단일 날짜' 요청입니다. 해당 날짜의 날씨와 TPO에 맞춰 **서로 다른 무드의 코디 조합을 3가지** 제안하세요."
         : "현재 '여러 날짜' 요청입니다. **각 날짜별로 최적의 코디를 1개씩** 제안하세요.";
 
-    // 프롬프트: JSON 구조에 대한 설명은 스키마(Config)로 넘기므로, 여기선 상황 설명에 집중합니다.
     const prompt = `
 당신은 최고의 AI 패션 스타일리스트입니다.
 아래 제공된 **[날짜별 상황]**을 면밀히 분석하여, 사용자가 가진 옷으로 가장 적절한 코디를 추천해주세요.
@@ -158,65 +183,62 @@ ${JSON.stringify(selected, null, 2)}
 1. **수량 규칙**: ${countInstruction}
 2. 날씨와 TPO(일정)를 최우선으로 고려하세요.
 3. 고정된 아이템이 있다면 절대 바꾸지 마세요.
-4. JSON 형식으로만 응답하며, 날짜 필드를 정확히 매핑하세요.
+4. 반드시 JSON 형식으로만 응답해야 합니다.
 `;
 
-    // Gemini가 반환해야 할 데이터 구조 정의 (Schema)
-    // 이렇게 설정하면 프롬프트에서 형식을 틀리게 줄 확률이 0%가 됩니다.
     const responseSchema = {
         type: "ARRAY",
         items: {
             type: "OBJECT",
             properties: {
-                date: { type: "STRING", description: "YYYY-MM-DD 형식의 날짜" },
-                outer: { type: "STRING", nullable: true, description: "아우터 ID (없으면 null)" },
-                top: { type: "STRING", description: "상의 ID" },
-                bottom: { type: "STRING", description: "하의 ID" },
-                shoes: { type: "STRING", description: "신발 ID" },
-                reason: { type: "STRING", description: "추천 이유 (한국어)" }
+                date: { type: "STRING" },
+                outer: { type: "STRING", nullable: true },
+                top: { type: "STRING" },
+                bottom: { type: "STRING" },
+                shoes: { type: "STRING" },
+                reason: { type: "STRING" }
             },
             required: ["date", "top", "bottom", "shoes", "reason"]
         }
     };
 
-    let attempt = 0;
-    while (attempt < MAX_RETRIES) {
+    // --- 실행 루프 ---
+    // 생성된 큐(Flash/Lite 무작위 섞임)를 순서대로 실행 -> 모두 실패 시 맨 마지막 Gemma 실행
+    for (let i = 0; i < attemptQueue.length; i++) {
+        const { key, model: currentModelName } = attemptQueue[i];
+        
+        // 너무 많은 재시도는 지연을 유발하므로, 메인 모델 시도는 최대 4회까지만 하고 바로 비상 모델로 건너뛰는 옵션도 고려 가능.
+        // 여기서는 큐에 있는 모든 조합(최대 7번: 2모델*3키 + 1비상)을 순차적으로 돕니다.
+        
         try {
-            const currentKey = apiKeys[attempt]; 
-            if (!currentKey) throw new Error(`API Key not found for attempt ${attempt + 1}`);
+            console.log(`[Gemini] 시도 ${i + 1}/${attemptQueue.length} - Model: ${currentModelName} (Key 끝자리: ...${key.slice(-4)})`);
 
-            // 1. SDK 클라이언트 초기화
-            const ai = new GoogleGenAI({ apiKey: currentKey });
-            
-            console.log(`[Gemini] 요청 시도 ${attempt + 1} (Model: ${GEMINI_MODEL})`);
-
-            // 2. 모델 설정 및 요청
-            const model = ai.getGenerativeModel({ 
-                model: GEMINI_MODEL,
-                // JSON 모드 강제 설정
+            const client = new GoogleGenAI({ apiKey: key });
+            const model = client.getGenerativeModel({
+                model: currentModelName,
                 generationConfig: {
                     responseMimeType: "application/json",
-                    responseSchema: responseSchema, 
+                    responseSchema: responseSchema,
                 }
             });
 
             const result = await model.generateContent(prompt);
             const response = result.response;
-            
-            // 3. 결과 파싱 (SDK가 이미 JSON 검증을 마친 텍스트를 줍니다)
-            const jsonText = response.text();
-            
-            // 안전하게 파싱 (혹시 모를 예외 처리)
-            return JSON.parse(jsonText);
+            const text = response.text();
+
+            // 성공 시 즉시 반환
+            return JSON.parse(text);
 
         } catch (error) {
-            console.error(`[Gemini] 오류 발생 (시도 ${attempt + 1}):`, error.message);
+            console.error(`❌ [Gemini] 실패 (${currentModelName}):`, error.message);
             
-            // 429(Too Many Requests)나 5xx 에러일 때만 재시도하는 로직은 SDK 내부 혹은 여기서 처리
-            // 여기서는 단순화하여 모든 에러에 대해 재시도
-            attempt++; 
-            if (attempt >= MAX_RETRIES) return [];
-            await new Promise(r => setTimeout(r, 1000 * attempt));
+            // 마지막 시도(비상 모델 포함)까지 실패했다면 빈 배열 반환
+            if (i === attemptQueue.length - 1) {
+                console.error("⛔ 모든 모델 및 키 시도 실패. 빈 결과를 반환합니다.");
+                return [];
+            }
+            // 재시도 전 짧은 대기 (서버 부하 방지)
+            await new Promise(r => setTimeout(r, 500));
         }
     }
 }
