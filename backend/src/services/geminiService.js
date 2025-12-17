@@ -11,7 +11,7 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
-
+// [헬퍼 함수] 시간 변환 (구버전 로직 유지)
 function toKST(date) {
   const utc = date.getTime() + (date.getTimezoneOffset() * 60 * 1000);
   const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
@@ -98,47 +98,42 @@ function getDayName(date) {
     return days[date.getDay()];
 }
 
-// ---------------------------------------------------------
-// [핵심 로직] 모델 로드 밸런싱 및 Fallback
-// ---------------------------------------------------------
+// =========================================================
+// [핵심 수정] 구버전의 '잘 되던 로직' + 신버전의 '안정성' 결합
+// =========================================================
 export async function getRecommendations(req, selected, clothes, period) {
+    // 1. API 키 확인
     const availableKeys = [
         process.env.GEMINI_API_KEY1,
         process.env.GEMINI_API_KEY2,
         process.env.GEMINI_API_KEY3
-    ].filter(key => key !== undefined && key !== ""); 
+    ].filter(k => k);
 
     if (availableKeys.length === 0) {
-        console.error("❌ [Error] 사용 가능한 API 키가 없습니다.");
+        console.error("❌ [Error] API 키가 없습니다.");
         return [];
     }
 
+    // 2. 모델 설정 (로드 밸런싱)
     const MAIN_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
     const SAFETY_MODEL = "gemma-3-12b-it";
 
     let attemptQueue = [];
     availableKeys.forEach(key => {
-        MAIN_MODELS.forEach(modelName => {
-            attemptQueue.push({ key: key, model: modelName });
-        });
+        MAIN_MODELS.forEach(model => attemptQueue.push({ key, model }));
     });
+    attemptQueue.sort(() => Math.random() - 0.5); // 셔플
+    attemptQueue.push({ key: availableKeys[0], model: SAFETY_MODEL }); // 마지막 안전장치
 
-    // 랜덤 셔플
-    attemptQueue.sort(() => Math.random() - 0.5);
-
-    // 마지막 안전장치
-    attemptQueue.push({ key: availableKeys[0], model: SAFETY_MODEL });
-
-    // --- 데이터 준비 ---
+    // 3. 데이터 준비
     let weatherData = null;
     try {
         weatherData = await getWeatherByRequest(req);
-    } catch (error) {
-        console.error("WeatherService Error:", error);
-    }
+    } catch (e) { console.error(e); }
 
     const contextString = await formatContextForPrompt(weatherData, period);
 
+    // 날짜 계산 (구버전 로직 유지)
     let startDate, endDate;
     if (period?.start) {
         startDate = new Date(period.start);
@@ -148,12 +143,12 @@ export async function getRecommendations(req, selected, clothes, period) {
         startDate = kstNow;
         endDate = kstNow;
     }
-    
     const isSingleDay = startDate.toDateString() === endDate.toDateString();
     const countInstruction = isSingleDay 
         ? "현재 '단일 날짜' 요청입니다. 해당 날짜의 날씨와 TPO에 맞춰 **서로 다른 무드의 코디 조합을 3가지** 제안하세요."
         : "현재 '여러 날짜' 요청입니다. **각 날짜별로 최적의 코디를 1개씩** 제안하세요.";
 
+    // 4. 프롬프트 (구버전 내용 완벽 복원 + ID 사용 강조)
     const prompt = `
 당신은 최고의 AI 패션 스타일리스트입니다.
 아래 제공된 **[날짜별 상황]**을 면밀히 분석하여, 사용자가 가진 옷으로 가장 적절한 코디를 추천해주세요.
@@ -169,41 +164,41 @@ ${JSON.stringify(clothes, null, 2)}
 ${JSON.stringify(selected, null, 2)}
 ========================================
 
-[요청 사항]
-1. **수량 규칙**: ${countInstruction}
-2. 날씨와 TPO(일정)를 최우선으로 고려하세요.
-3. 고정된 아이템이 있다면 절대 바꾸지 마세요.
-4. 반드시 JSON 형식으로만 응답해야 합니다.
+[필수 규칙]
+1. 응답은 반드시 **JSON 배열** 형식이어야 합니다.
+2. **수량 규칙**: ${countInstruction}
+3. **[중요]** 'outer', 'top', 'bottom', 'shoes' 필드에는 옷의 이름이 아니라 **반드시 [사용자 옷장 목록]에 있는 'id' 값**을 정확히 넣어야 합니다.
+4. 해당 카테고리에 추천할 옷이 없거나 필요 없는 경우(예: 여름이라 아우터 불필요)에는 null을 넣으세요.
+5. 날씨와 TPO(일정)를 최우선으로 고려하세요.
+6. 고정된 아이템이 있다면 절대 바꾸지 마세요.
 `;
 
-    // 표준 SDK용 스키마 정의 (SchemaType 사용)
+    // 5. JSON 스키마 (프론트엔드가 원하는 형식을 강제함)
     const responseSchema = {
         type: SchemaType.ARRAY,
         items: {
             type: SchemaType.OBJECT,
             properties: {
-                date: { type: SchemaType.STRING },
-                outer: { type: SchemaType.STRING, nullable: true },
-                top: { type: SchemaType.STRING },
-                bottom: { type: SchemaType.STRING },
-                shoes: { type: SchemaType.STRING },
-                reason: { type: SchemaType.STRING }
+                date: { type: SchemaType.STRING, description: "YYYY-MM-DD" },
+                // [중요] null 허용 (nullable: true)
+                outer: { type: SchemaType.STRING, nullable: true, description: "옷의 ID 값 (없으면 null)" },
+                top: { type: SchemaType.STRING, description: "옷의 ID 값" },
+                bottom: { type: SchemaType.STRING, description: "옷의 ID 값" },
+                shoes: { type: SchemaType.STRING, description: "옷의 ID 값" },
+                reason: { type: SchemaType.STRING, description: "추천 이유" }
             },
             required: ["date", "top", "bottom", "shoes", "reason"]
         }
     };
 
-    // --- 실행 루프 ---
+    // 6. 실행 루프
     for (let i = 0; i < attemptQueue.length; i++) {
         const { key, model: currentModelName } = attemptQueue[i];
         
         try {
-            console.log(`[Gemini] 시도 ${i + 1}/${attemptQueue.length} - Model: ${currentModelName}`);
-
-            // [핵심] 표준 SDK 초기화 방식 (new GoogleGenerativeAI(key))
-            const genAI = new GoogleGenerativeAI(key);
+            console.log(`[Gemini] 시도 ${i+1}/${attemptQueue.length} - ${currentModelName}`);
             
-            // [핵심] getGenerativeModel 함수 호출 (이제 오류 안 남)
+            const genAI = new GoogleGenerativeAI(key);
             const model = genAI.getGenerativeModel({
                 model: currentModelName,
                 generationConfig: {
@@ -214,17 +209,13 @@ ${JSON.stringify(selected, null, 2)}
 
             const result = await model.generateContent(prompt);
             const response = await result.response;
-            const text = response.text();
-
-            return JSON.parse(text);
+            
+            // JSON 파싱해서 반환
+            return JSON.parse(response.text());
 
         } catch (error) {
-            console.error(`[Gemini] 실패 (${currentModelName}):`, error.message);
-            
-            if (i === attemptQueue.length - 1) {
-                console.error("모든 모델 및 키 시도 실패. 빈 결과를 반환합니다.");
-                return [];
-            }
+            console.error(`❌ 실패 (${currentModelName}):`, error.message);
+            if (i === attemptQueue.length - 1) return []; // 모두 실패시 빈배열
             await new Promise(r => setTimeout(r, 500));
         }
     }
