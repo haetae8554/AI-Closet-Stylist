@@ -1,4 +1,3 @@
-
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import dotenv from "dotenv";
 import pg from "pg";
@@ -12,7 +11,7 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
-// [중요] Date 객체를 한국 시간(KST) 기준의 Date 객체로 변환하는 헬퍼
+
 function toKST(date) {
   const utc = date.getTime() + (date.getTimezoneOffset() * 60 * 1000);
   const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
@@ -103,7 +102,6 @@ function getDayName(date) {
 // [핵심 로직] 모델 로드 밸런싱 및 Fallback
 // ---------------------------------------------------------
 export async function getRecommendations(req, selected, clothes, period) {
-    // 1. 사용할 API 키 목록
     const availableKeys = [
         process.env.GEMINI_API_KEY1,
         process.env.GEMINI_API_KEY2,
@@ -118,7 +116,6 @@ export async function getRecommendations(req, selected, clothes, period) {
     const MAIN_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
     const SAFETY_MODEL = "gemma-3-12b-it";
 
-    // 2. 시도할 큐(Queue) 생성
     let attemptQueue = [];
     availableKeys.forEach(key => {
         MAIN_MODELS.forEach(modelName => {
@@ -126,10 +123,10 @@ export async function getRecommendations(req, selected, clothes, period) {
         });
     });
 
-    // 3. 랜덤 셔플 (로드 밸런싱)
+    // 랜덤 셔플
     attemptQueue.sort(() => Math.random() - 0.5);
 
-    // 4. 마지막 안전장치 추가
+    // 마지막 안전장치
     attemptQueue.push({ key: availableKeys[0], model: SAFETY_MODEL });
 
     // --- 데이터 준비 ---
@@ -179,7 +176,7 @@ ${JSON.stringify(selected, null, 2)}
 4. 반드시 JSON 형식으로만 응답해야 합니다.
 `;
 
-    // 표준 SDK용 스키마 정의
+    // 표준 SDK용 스키마 정의 (SchemaType 사용)
     const responseSchema = {
         type: SchemaType.ARRAY,
         items: {
@@ -203,8 +200,10 @@ ${JSON.stringify(selected, null, 2)}
         try {
             console.log(`[Gemini] 시도 ${i + 1}/${attemptQueue.length} - Model: ${currentModelName}`);
 
-            // [수정됨] 표준 SDK 문법 사용 (GoogleGenerativeAI + getGenerativeModel)
+            // [핵심] 표준 SDK 초기화 방식 (new GoogleGenerativeAI(key))
             const genAI = new GoogleGenerativeAI(key);
+            
+            // [핵심] getGenerativeModel 함수 호출 (이제 오류 안 남)
             const model = genAI.getGenerativeModel({
                 model: currentModelName,
                 generationConfig: {
@@ -214,13 +213,13 @@ ${JSON.stringify(selected, null, 2)}
             });
 
             const result = await model.generateContent(prompt);
-            const response = await result.response; // await 필요
+            const response = await result.response;
             const text = response.text();
 
             return JSON.parse(text);
 
         } catch (error) {
-            console.error(`❌ [Gemini] 실패 (${currentModelName}):`, error.message);
+            console.error(`[Gemini] 실패 (${currentModelName}):`, error.message);
             
             if (i === attemptQueue.length - 1) {
                 console.error("모든 모델 및 키 시도 실패. 빈 결과를 반환합니다.");
