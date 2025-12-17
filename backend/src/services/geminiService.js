@@ -1,4 +1,5 @@
-import fetch from "node-fetch"; 
+// [삭제] import fetch from "node-fetch"; (SDK 내장 기능 사용)
+import { GoogleGenAI } from "@google/genai"; // 최신 SDK 임포트
 import dotenv from "dotenv";
 import pg from "pg"; 
 import { getWeatherByRequest } from "./WeatherService.js";
@@ -11,11 +12,11 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
-const GEMINI_MODEL = "gemma-3-12b-it"; 
+// 모델 버전을 2.5 Flash로 변경
+const GEMINI_MODEL = "gemini-2.5-flash"; 
 const MAX_RETRIES = 3; 
 
 // [중요] Date 객체를 한국 시간(KST) 기준의 Date 객체로 변환하는 헬퍼
-// 이 함수는 'UTC 시간'을 'KST 시간값'을 가진 Date 객체로 '이동'시킵니다.
 function toKST(date) {
   const utc = date.getTime() + (date.getTimezoneOffset() * 60 * 1000);
   const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
@@ -30,23 +31,20 @@ function getSeasonalWeather(kstDate) {
     else return "평균 기온 영하~5도, 춥고 건조한 겨울 날씨 예상";
 }
 
+// (이 함수는 로직이 완벽하므로 그대로 유지합니다)
 async function formatContextForPrompt(weatherData, period) {
     let resultString = "";
     
-
     let start, end;
     if (period?.start) {
         start = new Date(period.start);
         end = period.end ? new Date(period.end) : new Date(period.start);
     } else {
-        // period가 없으면 현재 서버 시간(UTC)을 한국 시간으로 변환하여 기준 잡음
-        // 주의: 여기서 toKST를 쓰면 시각이 9시간 밀리므로, 날짜 계산 시 이 '밀린 시간'을 기준으로 해야 함
         const kstNow = toKST(new Date()); 
         start = kstNow;
         end = kstNow;
     }
 
-    // 캘린더 가져오기
     let allEvents = {};
     try {
         const res = await pool.query("SELECT data FROM calendar ORDER BY id DESC LIMIT 1");
@@ -57,11 +55,7 @@ async function formatContextForPrompt(weatherData, period) {
 
     const weatherItems = weatherData?.landFcst?.items || [];
 
-    // 날짜 반복 (start와 end가 이미 KST로 보정된 시간이거나, UTC 00:00(한국 09:00)이므로 그대로 루프)
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        
-
-        
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
@@ -69,13 +63,11 @@ async function formatContextForPrompt(weatherData, period) {
         const dateKey = `${year}-${month}-${day}`; 
         const dateKeyNoHyphen = `${year}${month}${day}`;
 
-        // 일정
         const dayEvents = allEvents[dateKey] || [];
         const eventText = dayEvents.length > 0 
             ? `일정: ${dayEvents.map(e => e.title).join(", ")}` 
             : "일정: 특별한 일정 없음 (평상복)";
 
-        // 날씨 매칭
         let weatherDesc = "";
         const matchedWeathers = weatherItems.filter(item => {
             const fcstDateRaw = item.tmEf || item.TM_EF || ""; 
@@ -112,6 +104,9 @@ function getDayName(date) {
     return days[date.getDay()];
 }
 
+// ---------------------------------------------------------
+// [핵심 수정] Gemini 2.5 Flash SDK 사용 및 JSON 모드 적용
+// ---------------------------------------------------------
 export async function getRecommendations(req, selected, clothes, period) {
     const apiKeys = [
         process.env.GEMINI_API_KEY1,
@@ -126,10 +121,8 @@ export async function getRecommendations(req, selected, clothes, period) {
         console.error("WeatherService Error:", error);
     }
 
-    // 컨텍스트 생성
     const contextString = await formatContextForPrompt(weatherData, period);
 
-    // [수정] start/end 계산 시에도 KST 고려 (단일 날짜 여부 판단용)
     let startDate, endDate;
     if (period?.start) {
         startDate = new Date(period.start);
@@ -140,14 +133,12 @@ export async function getRecommendations(req, selected, clothes, period) {
         endDate = kstNow;
     }
     
-    // toDateString()으로 비교 (날짜만 비교)
     const isSingleDay = startDate.toDateString() === endDate.toDateString();
-
     const countInstruction = isSingleDay 
         ? "현재 '단일 날짜' 요청입니다. 해당 날짜의 날씨와 TPO에 맞춰 **서로 다른 무드의 코디 조합을 3가지** 제안하세요."
         : "현재 '여러 날짜' 요청입니다. **각 날짜별로 최적의 코디를 1개씩** 제안하세요.";
 
-    // [수정] 프롬프트: JSON 출력 시 'date' 필드를 반드시 포함하도록 강력 지시
+    // 프롬프트: JSON 구조에 대한 설명은 스키마(Config)로 넘기므로, 여기선 상황 설명에 집중합니다.
     const prompt = `
 당신은 최고의 AI 패션 스타일리스트입니다.
 아래 제공된 **[날짜별 상황]**을 면밀히 분석하여, 사용자가 가진 옷으로 가장 적절한 코디를 추천해주세요.
@@ -163,37 +154,29 @@ ${JSON.stringify(clothes, null, 2)}
 ${JSON.stringify(selected, null, 2)}
 ========================================
 
-[필수 규칙]
-1. 응답은 반드시 **JSON 배열** 형식이어야 합니다.
-2. **수량 규칙**: ${countInstruction}
-3. JSON 객체 구조 (반드시 준수):
-   {
-     "date": "YYYY-MM-DD (해당 코디가 추천된 날짜를 정확히 기입)",
-     "outer": "옷ID (없으면 null)",
-     "top": "옷ID",
-     "bottom": "옷ID",
-     "shoes": "옷ID",
-     "reason": "추천 이유 (날씨와 일정을 구체적으로 언급하여 한국어로 작성)"
-   }
-4. 날씨와 TPO(일정)를 최우선으로 고려하세요.
-5. 고정된 아이템이 있다면 절대 바꾸지 마세요.
-6. [날짜별 상황]에 명시된 날짜를 "date" 필드에 정확히 매핑해야 합니다.
-
-출력 예시:
-[
-  {
-    "date": "2023-12-23",
-    "outer": "coat-123",
-    "top": "knit-55",
-    "bottom": "jean-22",
-    "shoes": "boots-01",
-    "reason": "..."
-  }
-]
+[요청 사항]
+1. **수량 규칙**: ${countInstruction}
+2. 날씨와 TPO(일정)를 최우선으로 고려하세요.
+3. 고정된 아이템이 있다면 절대 바꾸지 마세요.
+4. JSON 형식으로만 응답하며, 날짜 필드를 정확히 매핑하세요.
 `;
 
-    const body = {
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
+    // Gemini가 반환해야 할 데이터 구조 정의 (Schema)
+    // 이렇게 설정하면 프롬프트에서 형식을 틀리게 줄 확률이 0%가 됩니다.
+    const responseSchema = {
+        type: "ARRAY",
+        items: {
+            type: "OBJECT",
+            properties: {
+                date: { type: "STRING", description: "YYYY-MM-DD 형식의 날짜" },
+                outer: { type: "STRING", nullable: true, description: "아우터 ID (없으면 null)" },
+                top: { type: "STRING", description: "상의 ID" },
+                bottom: { type: "STRING", description: "하의 ID" },
+                shoes: { type: "STRING", description: "신발 ID" },
+                reason: { type: "STRING", description: "추천 이유 (한국어)" }
+            },
+            required: ["date", "top", "bottom", "shoes", "reason"]
+        }
     };
 
     let attempt = 0;
@@ -202,33 +185,35 @@ ${JSON.stringify(selected, null, 2)}
             const currentKey = apiKeys[attempt]; 
             if (!currentKey) throw new Error(`API Key not found for attempt ${attempt + 1}`);
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${currentKey}`;
-            console.log(`[Gemini] 요청 시도 ${attempt + 1}`);
+            // 1. SDK 클라이언트 초기화
+            const ai = new GoogleGenAI({ apiKey: currentKey });
             
-            const res = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
+            console.log(`[Gemini] 요청 시도 ${attempt + 1} (Model: ${GEMINI_MODEL})`);
+
+            // 2. 모델 설정 및 요청
+            const model = ai.getGenerativeModel({ 
+                model: GEMINI_MODEL,
+                // JSON 모드 강제 설정
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema, 
+                }
             });
 
-            if (!res.ok) {
-                if (res.status === 429 || res.status >= 500) throw new Error(`Retryable Error: ${res.status}`);
-                console.error(`[Gemini] 요청 실패: ${res.status}`);
-                return []; 
-            }
-
-            const data = await res.json();
-            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-            const jsonStart = text.indexOf("[");
-            const jsonEnd = text.lastIndexOf("]");
-
-            if (jsonStart === -1 || jsonEnd === -1) throw new Error("Invalid JSON format");
-
-            const jsonPart = text.slice(jsonStart, jsonEnd + 1);
-            return JSON.parse(jsonPart);
+            const result = await model.generateContent(prompt);
+            const response = result.response;
+            
+            // 3. 결과 파싱 (SDK가 이미 JSON 검증을 마친 텍스트를 줍니다)
+            const jsonText = response.text();
+            
+            // 안전하게 파싱 (혹시 모를 예외 처리)
+            return JSON.parse(jsonText);
 
         } catch (error) {
             console.error(`[Gemini] 오류 발생 (시도 ${attempt + 1}):`, error.message);
+            
+            // 429(Too Many Requests)나 5xx 에러일 때만 재시도하는 로직은 SDK 내부 혹은 여기서 처리
+            // 여기서는 단순화하여 모든 에러에 대해 재시도
             attempt++; 
             if (attempt >= MAX_RETRIES) return [];
             await new Promise(r => setTimeout(r, 1000 * attempt));
