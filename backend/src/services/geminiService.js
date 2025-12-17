@@ -1,4 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
+
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import dotenv from "dotenv";
 import pg from "pg";
 import { getWeatherByRequest } from "./WeatherService.js";
@@ -11,7 +12,7 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
 
-
+// [중요] Date 객체를 한국 시간(KST) 기준의 Date 객체로 변환하는 헬퍼
 function toKST(date) {
   const utc = date.getTime() + (date.getTimezoneOffset() * 60 * 1000);
   const KR_TIME_DIFF = 9 * 60 * 60 * 1000;
@@ -98,46 +99,38 @@ function getDayName(date) {
     return days[date.getDay()];
 }
 
-
+// ---------------------------------------------------------
+// [핵심 로직] 모델 로드 밸런싱 및 Fallback
+// ---------------------------------------------------------
 export async function getRecommendations(req, selected, clothes, period) {
     // 1. 사용할 API 키 목록
     const availableKeys = [
         process.env.GEMINI_API_KEY1,
         process.env.GEMINI_API_KEY2,
         process.env.GEMINI_API_KEY3
-    ].filter(key => key !== undefined && key !== ""); // 빈 키 제거
+    ].filter(key => key !== undefined && key !== ""); 
 
     if (availableKeys.length === 0) {
         console.error("❌ [Error] 사용 가능한 API 키가 없습니다.");
         return [];
     }
 
-    // 2. 주력 모델 목록
     const MAIN_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
-    
-    // 3. 비상용 모델
     const SAFETY_MODEL = "gemma-3-12b-it";
 
-    // -------------------------------------------------------
-    // [전략] 시도할 후보군(Candidate) 생성 및 셔플
-    // (Key1, Flash), (Key1, Lite), (Key2, Flash)... 등 모든 조합 생성
-    // -------------------------------------------------------
+    // 2. 시도할 큐(Queue) 생성
     let attemptQueue = [];
-    
     availableKeys.forEach(key => {
         MAIN_MODELS.forEach(modelName => {
             attemptQueue.push({ key: key, model: modelName });
         });
     });
 
-    // 셔플 (Fisher-Yates Shuffle 대용: 랜덤 정렬)
-    // 이로 인해 호출 때마다 Flash와 Lite, 그리고 Key 1,2,3의 순서가 무작위로 섞임
+    // 3. 랜덤 셔플 (로드 밸런싱)
     attemptQueue.sort(() => Math.random() - 0.5);
 
-    // 마지막 안전장치 추가 (비상용 모델은 맨 뒤에 한 번만 시도)
-    // 키는 가장 첫 번째 키(혹은 랜덤)를 사용
+    // 4. 마지막 안전장치 추가
     attemptQueue.push({ key: availableKeys[0], model: SAFETY_MODEL });
-
 
     // --- 데이터 준비 ---
     let weatherData = null;
@@ -186,35 +179,33 @@ ${JSON.stringify(selected, null, 2)}
 4. 반드시 JSON 형식으로만 응답해야 합니다.
 `;
 
+    // 표준 SDK용 스키마 정의
     const responseSchema = {
-        type: "ARRAY",
+        type: SchemaType.ARRAY,
         items: {
-            type: "OBJECT",
+            type: SchemaType.OBJECT,
             properties: {
-                date: { type: "STRING" },
-                outer: { type: "STRING", nullable: true },
-                top: { type: "STRING" },
-                bottom: { type: "STRING" },
-                shoes: { type: "STRING" },
-                reason: { type: "STRING" }
+                date: { type: SchemaType.STRING },
+                outer: { type: SchemaType.STRING, nullable: true },
+                top: { type: SchemaType.STRING },
+                bottom: { type: SchemaType.STRING },
+                shoes: { type: SchemaType.STRING },
+                reason: { type: SchemaType.STRING }
             },
             required: ["date", "top", "bottom", "shoes", "reason"]
         }
     };
 
     // --- 실행 루프 ---
-    // 생성된 큐(Flash/Lite 무작위 섞임)를 순서대로 실행 -> 모두 실패 시 맨 마지막 Gemma 실행
     for (let i = 0; i < attemptQueue.length; i++) {
         const { key, model: currentModelName } = attemptQueue[i];
         
-        // 너무 많은 재시도는 지연을 유발하므로, 메인 모델 시도는 최대 4회까지만 하고 바로 비상 모델로 건너뛰는 옵션도 고려 가능.
-        // 여기서는 큐에 있는 모든 조합(최대 7번: 2모델*3키 + 1비상)을 순차적으로 돕니다.
-        
         try {
-            console.log(`[Gemini] 시도 ${i + 1}/${attemptQueue.length} - Model: ${currentModelName} (Key 끝자리: ...${key.slice(-4)})`);
+            console.log(`[Gemini] 시도 ${i + 1}/${attemptQueue.length} - Model: ${currentModelName}`);
 
-            const client = new GoogleGenAI({ apiKey: key });
-            const model = client.getGenerativeModel({
+            // [수정됨] 표준 SDK 문법 사용 (GoogleGenerativeAI + getGenerativeModel)
+            const genAI = new GoogleGenerativeAI(key);
+            const model = genAI.getGenerativeModel({
                 model: currentModelName,
                 generationConfig: {
                     responseMimeType: "application/json",
@@ -223,21 +214,18 @@ ${JSON.stringify(selected, null, 2)}
             });
 
             const result = await model.generateContent(prompt);
-            const response = result.response;
+            const response = await result.response; // await 필요
             const text = response.text();
 
-            // 성공 시 즉시 반환
             return JSON.parse(text);
 
         } catch (error) {
             console.error(`❌ [Gemini] 실패 (${currentModelName}):`, error.message);
             
-            // 마지막 시도(비상 모델 포함)까지 실패했다면 빈 배열 반환
             if (i === attemptQueue.length - 1) {
-                console.error("⛔ 모든 모델 및 키 시도 실패. 빈 결과를 반환합니다.");
+                console.error("모든 모델 및 키 시도 실패. 빈 결과를 반환합니다.");
                 return [];
             }
-            // 재시도 전 짧은 대기 (서버 부하 방지)
             await new Promise(r => setTimeout(r, 500));
         }
     }
